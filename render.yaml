@@ -1,0 +1,61 @@
+databases:
+  - name: inventra-db
+    plan: free
+    databaseName: inventra
+    user: inventra
+
+services:
+  - type: web
+    name: inventra-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /admin/login/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: api.inventra.sn
+      - key: DB_ENGINE
+        value: django.db.backends.postgresql
+      - key: DB_NAME
+        fromDatabase:
+          name: inventra-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: inventra-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: inventra-db
+          property: password
+      - key: DB_HOST
+        fromDatabase:
+          name: inventra-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: inventra-db
+          property: port
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://inventra.sn
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "False"
+      - key: WAVE_API_BASE_URL
+        value: https://api.wave.com
+
+  - type: web
+    name: inventra-web
+    runtime: static
+    rootDir: web
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: VITE_API_URL
+        value: https://api.inventra.sn/api/v1
+      - key: VITE_APP_URL
+        value: https://inventra.sn
