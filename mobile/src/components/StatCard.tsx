@@ -13,6 +13,7 @@ type Props = {
 export default function StatCard({ title, value, icon, color = colors.primary }: Props) {
   return (
     <View style={styles.card}>
+      <View style={[styles.accent, { backgroundColor: color }]} />
       <View style={[styles.iconWrap, { backgroundColor: color + '18' }]}>
         <MaterialCommunityIcons name={icon} size={22} color={color} />
       </View>
@@ -31,6 +32,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     minWidth: '46%',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  accent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: colors.primary,
   },
   iconWrap: {
     width: 40,

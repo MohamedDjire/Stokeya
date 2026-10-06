@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Linking, Modal, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Image, Linking, Modal, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Appbar,
+  Avatar,
   Button,
   Card,
   IconButton,
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import * as Print from 'expo-print';
 import { fetchProducts, type Product } from '../api/auth';
 import { fetchCustomers, type Customer } from '../api/customers';
@@ -23,10 +25,19 @@ import BarcodeScanner from '../components/BarcodeScanner';
 import OfflineBanner from '../components/OfflineBanner';
 import { cacheCatalog, cachePosContext, enqueueOfflineSale, loadCachedCatalog, loadPosContext } from '../offline/storage';
 import { buildOfflineSaleFromCart, isOnline } from '../offline/sync';
+import { API_BASE_URL } from '../config/api';
 import { webPaymentUrl } from '../config/web';
 import { colors, spacing } from '../theme/colors';
+import { unitPriceForQty } from '../utils/pricing';
 
 type CartLine = { product: Product; quantity: number };
+
+function productImageUrl(image: string | null | undefined): string | undefined {
+  if (!image) return undefined;
+  if (image.startsWith('http')) return image;
+  const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return `${origin}${image.startsWith('/') ? '' : '/'}${image}`;
+}
 
 export default function POSScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -46,8 +57,28 @@ export default function POSScreen() {
   const [openingBalance, setOpeningBalance] = useState('0');
 
   useEffect(() => {
-    Promise.all([fetchProducts(), fetchBranches(), fetchWarehouses(), fetchCustomers(), fetchCashRegisters()])
-      .then(([productData, branches, warehouses, customerData, registers]) => {
+    let cancelled = false;
+    (async () => {
+      const cached = await loadCachedCatalog();
+      if (!cancelled && cached.length) {
+        setProducts(cached as Product[]);
+        setLoading(false);
+        const ctx = await loadPosContext();
+        if (ctx) {
+          setBranchId(ctx.branchId);
+          setWarehouseId(ctx.warehouseId);
+          setCashRegisterId(ctx.cashRegisterId);
+        }
+      }
+      try {
+        const [productData, branches, warehouses, customerData, registers] = await Promise.all([
+          fetchProducts(),
+          fetchBranches(),
+          fetchWarehouses(),
+          fetchCustomers(),
+          fetchCashRegisters(),
+        ]);
+        if (cancelled) return;
         setProducts(productData);
         setCustomers(customerData);
         setCashRegisters(registers);
@@ -62,6 +93,9 @@ export default function POSScreen() {
           name: p.name,
           sku: p.sku,
           sale_price: p.sale_price,
+          wholesale_price: p.wholesale_price,
+          wholesale_min_qty: p.wholesale_min_qty,
+          image: p.image,
           barcodes: p.barcodes,
           total_stock: p.total_stock,
         })));
@@ -70,23 +104,15 @@ export default function POSScreen() {
           warehouseId: wh?.id || null,
           cashRegisterId: openReg?.id || null,
         });
-      })
-      .catch(async () => {
-        const cached = await loadCachedCatalog();
-        const ctx = await loadPosContext();
-        if (cached.length) {
-          setProducts(cached as Product[]);
-          if (ctx) {
-            setBranchId(ctx.branchId);
-            setWarehouseId(ctx.warehouseId);
-            setCashRegisterId(ctx.cashRegisterId);
-          }
-          Alert.alert('Mode hors ligne', 'Catalogue chargé depuis le cache local.');
-        } else {
+      } catch {
+        if (!cancelled && !cached.length) {
           Alert.alert('Erreur', 'Impossible de charger le catalogue (pas de cache).');
         }
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const filtered = useMemo(() => {
@@ -101,7 +127,7 @@ export default function POSScreen() {
   }, [products, search]);
 
   const total = cart.reduce(
-    (sum, line) => sum + line.quantity * Number(line.product.sale_price),
+    (sum, line) => sum + line.quantity * unitPriceForQty(line.product, line.quantity),
     0,
   );
 
@@ -164,12 +190,13 @@ export default function POSScreen() {
     );
   };
 
-  const printReceipt = async (saleId: number) => {
+  const printReceipt = async (saleId: number): Promise<boolean> => {
     try {
       const receipt = await fetchSaleReceipt(saleId);
       await Print.printAsync({ html: receipt.html });
+      return true;
     } catch {
-      Alert.alert('Info', 'Ticket généré mais impression indisponible sur cet appareil.');
+      return false;
     }
   };
 
@@ -224,7 +251,7 @@ export default function POSScreen() {
         items: cart.map((l) => ({
           product_id: l.product.id,
           quantity: String(l.quantity),
-          unit_price: l.product.sale_price,
+          unit_price: String(unitPriceForQty(l.product, l.quantity)),
         })),
       });
       if (paymentMethod === 'mobile_money') {
@@ -233,17 +260,23 @@ export default function POSScreen() {
         setCustomerId(null);
         Alert.alert(
           'Paiement Mobile Money',
-          `Vente ${sale.reference} créée. Choisissez Wave, Orange Money ou MTN Money sur la page web Inventra.`,
+          `Vente ${sale.reference} créée. Payez sur la page sécurisée SasPay : mobile money, carte ou autre moyen.`,
           [
             { text: 'Plus tard', style: 'cancel' },
             { text: 'Ouvrir le paiement', onPress: () => Linking.openURL(url) },
           ],
         );
       } else {
-        Alert.alert('Vente réussie', `${sale.reference}\n${Number(sale.total).toLocaleString('fr-FR')} XOF`, [
-          { text: 'Ticket', onPress: () => printReceipt(sale.id) },
-          { text: 'OK' },
-        ]);
+        setCart([]);
+        setView('catalog');
+        const printed = await printReceipt(sale.id);
+        Alert.alert(
+          'Vente réussie',
+          printed
+            ? `${sale.reference}\n${Number(sale.total).toLocaleString('fr-FR')} XOF\nTicket envoyé à l'imprimante.`
+            : `${sale.reference}\n${Number(sale.total).toLocaleString('fr-FR')} XOF\nImpression indisponible.`,
+        );
+        return;
       }
       setCart([]);
       setView('catalog');
@@ -296,7 +329,7 @@ export default function POSScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.Content
           title="Caisse"
           subtitle={`${total.toLocaleString('fr-FR')} XOF · ${activeRegister?.is_open ? 'Ouverte' : 'Fermée'}`}
@@ -310,7 +343,7 @@ export default function POSScreen() {
             <Menu.Item key={c.id} title={c.name} onPress={() => { setCustomerId(c.id); setCustomerMenu(false); }} />
           ))}
         </Menu>
-      </Appbar.Header>
+      </AppHeader>
 
       <OfflineBanner />
 
@@ -360,19 +393,32 @@ export default function POSScreen() {
             data={filtered}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.productList}
-            renderItem={({ item }) => (
-              <Card style={styles.productCard} onPress={() => addToCart(item)} mode="elevated">
-                <Card.Content style={styles.productRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="titleSmall" style={styles.productName}>{item.name}</Text>
-                    <Text variant="bodySmall" style={styles.productPrice}>
-                      {Number(item.sale_price).toLocaleString('fr-FR')} XOF
-                    </Text>
-                  </View>
-                  <IconButton icon="plus-circle" iconColor={colors.primary} size={28} onPress={() => addToCart(item)} />
-                </Card.Content>
-              </Card>
-            )}
+            renderItem={({ item }) => {
+              const img = productImageUrl(item.image);
+              return (
+                <Card style={styles.productCard} onPress={() => addToCart(item)} mode="elevated">
+                  <Card.Content style={styles.productRow}>
+                    {img ? (
+                      <Image source={{ uri: img }} style={styles.thumb} />
+                    ) : (
+                      <Avatar.Icon size={48} icon="package-variant" style={styles.thumbPlaceholder} color={colors.primary} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text variant="titleSmall" style={styles.productName}>{item.name}</Text>
+                      <Text variant="bodySmall" style={styles.productPrice}>
+                        {Number(item.sale_price).toLocaleString('fr-FR')} F
+                      </Text>
+                      {Number(item.wholesale_price || 0) > 0 && (
+                        <Text variant="labelSmall" style={{ color: '#2E7D32', fontWeight: '700' }}>
+                          Gros {Number(item.wholesale_price).toLocaleString('fr-FR')} F dès {Number(item.wholesale_min_qty || 10)}
+                        </Text>
+                      )}
+                    </View>
+                    <IconButton icon="plus-circle" iconColor={colors.primary} size={28} onPress={() => addToCart(item)} />
+                  </Card.Content>
+                </Card>
+              );
+            }}
             ListEmptyComponent={<Text style={styles.empty}>Aucun produit trouvé</Text>}
           />
         </>
@@ -388,7 +434,7 @@ export default function POSScreen() {
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyLarge" style={styles.cartName}>{item.product.name}</Text>
                   <Text variant="bodySmall" style={styles.cartPrice}>
-                    {(item.quantity * Number(item.product.sale_price)).toLocaleString('fr-FR')} XOF
+                    {(item.quantity * unitPriceForQty(item.product, item.quantity)).toLocaleString('fr-FR')} F
                   </Text>
                 </View>
                 <IconButton icon="minus-circle-outline" size={22} onPress={() => updateQty(item.product.id, -1)} />
@@ -403,7 +449,7 @@ export default function POSScreen() {
               style={styles.payBtn} contentStyle={styles.payBtnContent}>Espèces</Button>
             <Button mode="contained-tonal" icon="cellphone" loading={processing}
               onPress={() => processSale('mobile_money')} style={styles.payBtn} contentStyle={styles.payBtnContent}>
-              Wave
+              Wave / Orange Money
             </Button>
           </View>
         </View>
@@ -427,7 +473,9 @@ const styles = StyleSheet.create({
   scanBtn: { marginHorizontal: spacing.md, marginBottom: spacing.sm },
   productList: { padding: spacing.md, paddingTop: 0, paddingBottom: spacing.xl },
   productCard: { marginBottom: spacing.sm, backgroundColor: colors.surface },
-  productRow: { flexDirection: 'row', alignItems: 'center' },
+  productRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  thumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#E5E7EB' },
+  thumbPlaceholder: { backgroundColor: `${colors.primary}15` },
   productName: { fontWeight: '600' },
   productPrice: { color: colors.primary, marginTop: 2, fontWeight: '600' },
   cartContainer: { flex: 1 },

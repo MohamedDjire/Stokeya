@@ -1,11 +1,11 @@
-# Inventra — Backlog Produit
+# Stokeya — Backlog Produit
 
 ## Épics & User Stories
 
 ### EPIC-01 — Authentification & Sécurité
 | ID | User Story | Priorité |
 |----|-----------|----------|
-| US-01.1 | En tant qu'admin entreprise, je veux créer un compte entreprise pour démarrer sur Inventra | Must |
+| US-01.1 | En tant qu'admin entreprise, je veux créer un compte entreprise pour démarrer sur Stokeya | Must |
 | US-01.2 | En tant qu'utilisateur, je veux me connecter avec email/téléphone + mot de passe | Must |
 | US-01.3 | En tant qu'utilisateur, je veux recevoir un JWT pour accéder à l'API de façon sécurisée | Must |
 | US-01.4 | En tant qu'utilisateur, je veux réinitialiser mon mot de passe oublié | Must |

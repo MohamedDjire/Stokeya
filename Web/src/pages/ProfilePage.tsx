@@ -8,196 +8,321 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import Grid from '@mui/material/Grid2';
+import EditIcon from '@mui/icons-material/EditOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
+import SettingsIcon from '@mui/icons-material/SettingsOutlined';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import PageHeader from '../components/PageHeader';
-import { updateProfile } from '../api/auth';
-import { fetchCompany, updateCompany, type Company } from '../api/company';
+import { updateProfile, uploadAvatar } from '../api/auth';
+import { fetchCompany, type Company } from '../api/company';
 import { getApiErrorMessage } from '../api/client';
-import { PERMISSION_LABELS } from '../utils/permissions';
+import { mediaUrl } from '../utils/media';
+import { hasFlag } from '../utils/permissions';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logoutThunk, setUser } from '../store/authSlice';
+import { useLocale } from '../locale/useLocale';
+
+const ROLE_LABELS: Record<string, string> = {
+  manager: 'Gérant',
+  warehouse_manager: 'Responsable entrepôt',
+  stock_keeper: 'Magasinier',
+  pos_manager: 'Responsable point de vente',
+  cashier: 'Caissier',
+  accountant: 'Comptable',
+};
+
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <Box sx={{ py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>
+        {label}
+      </Typography>
+      <Typography variant="body1">{value?.trim() || '—'}</Typography>
+    </Box>
+  );
+}
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { tr, version } = useLocale();
+  void version;
   const user = useAppSelector((s) => s.auth.user);
   const isAdmin = !!user?.is_company_admin;
+  const canEditPrefs = isAdmin || hasFlag(user, 'can_edit_settings');
 
+  const [company, setCompany] = useState<Company | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [profile, setProfile] = useState({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     phone: user?.phone || '',
   });
-  const [company, setCompany] = useState<Company | null>(null);
-  const [companyForm, setCompanyForm] = useState({ name: '', phone: '', address: '', currency: '', tax_rate: '' });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingCompany, setSavingCompany] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
-    fetchCompany().then((c) => {
-      setCompany(c);
-      setCompanyForm({
-        name: c.name,
-        phone: c.phone || '',
-        address: c.address || '',
-        currency: c.currency || 'XOF',
-        tax_rate: String(c.tax_rate ?? ''),
-      });
-    }).catch(() => undefined);
+    fetchCompany().then(setCompany).catch(() => undefined);
   }, []);
 
-  const initials = (user?.full_name || user?.email || '?')
-    .split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+  const openEdit = () => {
+    setProfile({
+      first_name: user?.first_name || '',
+      last_name: user?.last_name || '',
+      phone: user?.phone || '',
+    });
+    setError(null);
+    setEditOpen(true);
+  };
 
   const saveProfile = async () => {
-    setSavingProfile(true);
+    setSaving(true);
     setError(null);
-    setMessage(null);
     try {
       const updated = await updateProfile(profile);
       dispatch(setUser(updated));
-      setMessage('Profil mis à jour.');
+      setEditOpen(false);
+      setMessage(tr('Profil personnel mis à jour.'));
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setSavingProfile(false);
+      setSaving(false);
     }
   };
 
-  const saveCompany = async () => {
-    setSavingCompany(true);
+  const onAvatar = async (file: File | null) => {
+    if (!file) return;
+    setUploadingAvatar(true);
     setError(null);
-    setMessage(null);
     try {
-      const updated = await updateCompany({
-        name: companyForm.name,
-        phone: companyForm.phone,
-        address: companyForm.address,
-        currency: companyForm.currency || 'XOF',
-        tax_rate: companyForm.tax_rate || '0',
-      });
-      setCompany(updated);
-      setMessage('Informations entreprise enregistrées.');
+      const updated = await uploadAvatar(file);
+      dispatch(setUser(updated));
+      setMessage(tr('Photo de profil mise à jour.'));
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setSavingCompany(false);
+      setUploadingAvatar(false);
     }
   };
 
   const logout = async () => {
-    if (!confirm('Voulez-vous vraiment vous déconnecter ?')) return;
+    if (!confirm(tr('Voulez-vous vraiment vous déconnecter ?'))) return;
     await dispatch(logoutThunk());
     navigate('/login');
   };
 
-  const permissions = user?.permissions || [];
+  const roleLabel = isAdmin
+    ? tr('Administrateur entreprise')
+    : (user?.role_code ? tr(ROLE_LABELS[user.role_code] || user.role_code) : tr('Utilisateur'));
+
+  const companyLogo = mediaUrl(company?.logo || user?.company_logo);
+  const userAvatar = mediaUrl(user?.avatar);
+  const companyInitials = (company?.name || '?')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const userInitials = (user?.full_name || user?.email || '?')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   return (
     <Box>
-      <PageHeader title="Mon compte" subtitle="Profil, entreprise, accès et paramètres" />
+      <PageHeader
+        title={tr('Mon profil')}
+        subtitle={tr('Informations de l’entreprise et de votre compte')}
+        action={(
+          <Button variant="contained" startIcon={<EditIcon />} onClick={openEdit}>
+            {tr('Modifier le profil')}
+          </Button>
+        )}
+      />
 
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Votre compte Inventra est unique : les mêmes identifiants fonctionnent sur la version web et l'application mobile.
-        Les paiements Mobile Money (Wave, Orange Money, MTN Money) passent par la page de paiement sécurisée du site.
-      </Alert>
-
-      {message && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {message && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMessage(null)}>{message}</Alert>
+      )}
+      {error && !editOpen && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>
+      )}
 
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Card sx={{ textAlign: 'center' }}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Card>
             <CardContent>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', mx: 'auto', mb: 2, fontSize: 28 }}>
-                {initials}
-              </Avatar>
-              <Typography variant="h6">{user?.full_name || 'Utilisateur'}</Typography>
-              <Typography variant="body2" color="text.secondary">{user?.email}</Typography>
-              <Chip sx={{ mt: 1 }} label={isAdmin ? 'Administrateur' : 'Utilisateur'} color={isAdmin ? 'primary' : 'default'} />
-            </CardContent>
-          </Card>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ sm: 'center' }} sx={{ mb: 2 }}>
+                <Avatar
+                  src={companyLogo}
+                  variant="rounded"
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    bgcolor: 'primary.main',
+                    fontSize: 28,
+                    fontWeight: 700,
+                  }}
+                >
+                  {companyInitials}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="overline" color="text.secondary">{tr('Entreprise')}</Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {company?.name || tr('Chargement…')}
+                  </Typography>
+                  {company?.slogan && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {company.slogan}
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
 
-          <Card sx={{ mt: 2 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Accès et autorisations</Typography>
-              {permissions.includes('ALL') ? (
-                <Typography variant="body2">Accès complet à tous les modules.</Typography>
-              ) : permissions.length ? (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {permissions.map((code) => (
-                    <Chip key={code} size="small" label={PERMISSION_LABELS[code] || code} variant="outlined" />
-                  ))}
-                </Stack>
-              ) : (
-                <Typography variant="body2" color="text.secondary">Aucune autorisation spécifique.</Typography>
+              <Divider sx={{ mb: 1 }} />
+
+              <InfoRow label={tr('Email')} value={company?.email} />
+              <InfoRow label={tr('Téléphone')} value={company?.phone} />
+              <InfoRow label={tr('Adresse')} value={company?.address} />
+              <InfoRow label={tr('Site web')} value={company?.website} />
+              <InfoRow label={tr('Identifiant fiscal')} value={company?.tax_id} />
+              <InfoRow label={tr('Pays')} value={company?.country} />
+              <InfoRow label={tr('Devise')} value={company?.currency} />
+              <InfoRow label={tr('Taux de TVA')} value={company ? `${company.tax_rate} %` : null} />
+
+              {canEditPrefs && (
+                <Box sx={{ mt: 2.5 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {tr('Pour modifier le logo de l’entreprise ou les paramètres, ouvrez Préférences.')}
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<SettingsIcon />}
+                    onClick={() => navigate('/preferences')}
+                  >
+                    {tr('Ouvrir les préférences')}
+                  </Button>
+                </Box>
               )}
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Profil</Typography>
-              <Stack spacing={2} sx={{ mt: 1 }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField label="Prénom" value={profile.first_name} onChange={(e) => setProfile({ ...profile, first_name: e.target.value })} fullWidth />
-                  <TextField label="Nom" value={profile.last_name} onChange={(e) => setProfile({ ...profile, last_name: e.target.value })} fullWidth />
-                </Stack>
-                <TextField label="Téléphone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} fullWidth />
-                <Button variant="contained" onClick={saveProfile} disabled={savingProfile} sx={{ alignSelf: 'flex-start' }}>
-                  Enregistrer
+              <Stack alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+                <Avatar
+                  src={userAvatar || companyLogo}
+                  sx={{ width: 88, height: 88, bgcolor: 'primary.main', fontSize: 28 }}
+                >
+                  {userInitials}
+                </Avatar>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<PhotoCameraIcon />}
+                  component="label"
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? tr('Envoi…') : tr('Changer ma photo')}
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => void onAvatar(e.target.files?.[0] || null)}
+                  />
                 </Button>
               </Stack>
+
+              <Typography variant="overline" color="text.secondary">{tr('Compte connecté')}</Typography>
+              <Typography variant="h6" sx={{ mt: 0.5 }}>
+                {user?.full_name || tr('Utilisateur')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">{user?.email}</Typography>
+              <Chip size="small" label={roleLabel} sx={{ mt: 1.5 }} color={isAdmin ? 'primary' : 'default'} />
+
+              <Divider sx={{ my: 2 }} />
+
+              <InfoRow label={tr('Téléphone')} value={user?.phone} />
+              <InfoRow label={tr('Point de vente')} value={user?.assigned_branch_name} />
+              <InfoRow label={tr('Caisse')} value={user?.assigned_cash_register_name} />
+
+              <Button
+                fullWidth
+                variant="outlined"
+                color="error"
+                startIcon={<LogoutIcon />}
+                onClick={logout}
+                sx={{ mt: 2.5 }}
+              >
+                {tr('Se déconnecter')}
+              </Button>
             </CardContent>
           </Card>
-
-          {company && (
-            <Card sx={{ mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Entreprise</Typography>
-                <Stack spacing={2} sx={{ mt: 1 }}>
-                  <TextField label="Nom de l'entreprise" value={companyForm.name} disabled={!isAdmin}
-                    onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })} fullWidth />
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <TextField label="Téléphone" value={companyForm.phone} disabled={!isAdmin}
-                      onChange={(e) => setCompanyForm({ ...companyForm, phone: e.target.value })} fullWidth />
-                    <TextField label="Devise" value={companyForm.currency} disabled={!isAdmin}
-                      onChange={(e) => setCompanyForm({ ...companyForm, currency: e.target.value })} fullWidth />
-                    <TextField label="TVA (%)" value={companyForm.tax_rate} disabled={!isAdmin}
-                      onChange={(e) => setCompanyForm({ ...companyForm, tax_rate: e.target.value })} fullWidth />
-                  </Stack>
-                  <TextField label="Adresse" value={companyForm.address} disabled={!isAdmin}
-                    onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} fullWidth multiline rows={2} />
-                  {isAdmin ? (
-                    <Button variant="contained" onClick={saveCompany} disabled={savingCompany} sx={{ alignSelf: 'flex-start' }}>
-                      Enregistrer
-                    </Button>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      Seul l'administrateur peut modifier ces informations.
-                    </Typography>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
-
-          <Box sx={{ mt: 3 }}>
-            <Button variant="outlined" color="error" startIcon={<LogoutIcon />} onClick={logout}>
-              Se déconnecter
-            </Button>
-          </Box>
         </Grid>
       </Grid>
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{tr('Modifier mon profil')}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {error && <Alert severity="error">{error}</Alert>}
+            <Stack alignItems="center" spacing={1}>
+              <Avatar src={userAvatar || companyLogo} sx={{ width: 72, height: 72 }}>
+                {userInitials}
+              </Avatar>
+              <Button size="small" component="label" startIcon={<PhotoCameraIcon />} disabled={uploadingAvatar}>
+                {tr('Photo de profil')}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => void onAvatar(e.target.files?.[0] || null)}
+                />
+              </Button>
+            </Stack>
+            <TextField label={tr('Email')} value={user?.email || ''} fullWidth disabled />
+            <TextField
+              label={tr('Prénom')}
+              value={profile.first_name}
+              onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label={tr('Nom')}
+              value={profile.last_name}
+              onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label={tr('Téléphone')}
+              value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditOpen(false)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={saveProfile} disabled={saving}>
+            {tr('Enregistrer')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

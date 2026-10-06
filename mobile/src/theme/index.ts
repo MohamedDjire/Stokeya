@@ -8,7 +8,7 @@ export const theme = {
     ...MD3LightTheme.colors,
     primary: colors.primary,
     onPrimary: '#FFFFFF',
-    primaryContainer: '#E3F2FD',
+    primaryContainer: '#CCFBF1',
     secondary: colors.secondary,
     background: colors.background,
     surface: colors.surface,

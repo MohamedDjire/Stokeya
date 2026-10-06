@@ -17,6 +17,7 @@ import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { stockAdjust, type StockStatusItem } from '../api/stock';
 import type { Product } from '../api/auth';
 import { getApiErrorMessage } from '../api/client';
+import { useLocale } from '../locale/useLocale';
 
 interface Line { product_id: number | ''; expected_quantity: string; actual_quantity: string; }
 
@@ -35,6 +36,8 @@ export default function StockAdjustDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { tr, version } = useLocale();
+  void version;
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([{ product_id: '', expected_quantity: '', actual_quantity: '' }]);
@@ -57,7 +60,7 @@ export default function StockAdjustDialog({
     setError(null);
     const valid = lines.filter((l) => l.product_id && l.actual_quantity !== '');
     if (!warehouseId || !reason || valid.length === 0) {
-      setError('Indiquez un motif et au moins un produit avec la quantité réelle.');
+      setError(tr('Indiquez un motif et au moins un produit avec la quantité réelle.'));
       return;
     }
     setSaving(true);
@@ -85,34 +88,34 @@ export default function StockAdjustDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Ajustement d'inventaire</DialogTitle>
+      <DialogTitle>{tr("Ajustement d'inventaire")}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          <TextField label="Motif" value={reason} onChange={(e) => setReason(e.target.value)} fullWidth
-            placeholder="Ex : inventaire physique, casse, péremption..." />
-          <Divider>Articles</Divider>
+          <TextField label={tr('Motif')} value={reason} onChange={(e) => setReason(e.target.value)} fullWidth
+            placeholder={tr('Ex : inventaire physique, casse, péremption...')} />
+          <Divider>{tr('Articles')}</Divider>
           {lines.map((l, i) => (
             <Stack key={i} direction="row" spacing={1} alignItems="center">
-              <TextField select label="Produit" value={l.product_id} size="small" sx={{ flex: 2 }}
+              <TextField select label={tr('Produit')} value={l.product_id} size="small" sx={{ flex: 2 }}
                 onChange={(e) => setProduct(i, Number(e.target.value))}>
                 {products.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
               </TextField>
-              <TextField label="Théorique" value={l.expected_quantity} size="small" sx={{ flex: 1 }} disabled />
-              <TextField label="Réel" type="number" value={l.actual_quantity} size="small" sx={{ flex: 1 }}
+              <TextField label={tr('Théorique')} value={l.expected_quantity} size="small" sx={{ flex: 1 }} disabled />
+              <TextField label={tr('Réel')} type="number" value={l.actual_quantity} size="small" sx={{ flex: 1 }}
                 onChange={(e) => setActual(i, e.target.value)} />
               <IconButton size="small" color="error" onClick={() => removeLine(i)}><DeleteIcon fontSize="small" /></IconButton>
             </Stack>
           ))}
           <Button startIcon={<AddIcon />} onClick={addLine} size="small" sx={{ alignSelf: 'flex-start' }}>
-            Ajouter un article
+            {tr('Ajouter un article')}
           </Button>
-          <TextField label="Note (optionnel)" value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth />
+          <TextField label={tr('Note (optionnel)')} value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth />
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose}>Annuler</Button>
-        <Button variant="contained" onClick={submit} disabled={saving}>Valider l'ajustement</Button>
+        <Button onClick={onClose}>{tr('Annuler')}</Button>
+        <Button variant="contained" onClick={submit} disabled={saving}>{tr("Valider l'ajustement")}</Button>
       </DialogActions>
     </Dialog>
   );

@@ -9,6 +9,7 @@ import {
   InputAdornment,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
@@ -19,7 +20,9 @@ import PageHeader from '../components/PageHeader';
 import ProductFormDialog from '../components/ProductFormDialog';
 import { fetchProducts, type Product } from '../api/auth';
 import { API_BASE_URL } from '../config/api';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatNumber } from '../utils/format';
+import { STOCK_STATUS_COLORS, STOCK_STATUS_LABELS, resolveStockStatus, type StockStatus } from '../utils/stock';
+import { useLocale } from '../locale/useLocale';
 
 function imageUrl(image: string | null): string | undefined {
   if (!image) return undefined;
@@ -29,6 +32,8 @@ function imageUrl(image: string | null): string | undefined {
 
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const { tr, version } = useLocale();
+  void version;
   const [rows, setRows] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -38,7 +43,8 @@ export default function ProductsPage() {
   const load = useCallback((q?: string) => {
     setLoading(true);
     fetchProducts(q)
-      .then(setRows)
+      .then((data) => setRows(Array.isArray(data) ? data : []))
+      .catch(() => setRows([]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -59,27 +65,42 @@ export default function ProductsPage() {
         </Avatar>
       ),
     },
-    { field: 'name', headerName: 'Produit', flex: 1, minWidth: 180 },
-    { field: 'sku', headerName: 'SKU', width: 120 },
-    { field: 'category_name', headerName: 'Catégorie', width: 140, valueGetter: (v) => v || '—' },
+    { field: 'name', headerName: tr('Produit'), flex: 1, minWidth: 180 },
+    { field: 'sku', headerName: tr('SKU'), width: 120 },
+    { field: 'category_name', headerName: tr('Catégorie'), width: 140, valueGetter: (v) => (v ? tr(String(v)) : '—') },
     {
       field: 'sale_price',
-      headerName: 'Prix vente',
-      width: 130,
-      valueFormatter: (v) => formatCurrency(v),
+      headerName: tr('Détail / Gros'),
+      width: 180,
+      sortable: false,
+      renderCell: (params) => {
+        const wholesale = Number(params.row.wholesale_price || 0);
+        const minQty = Number(params.row.wholesale_min_qty || 10);
+        return (
+          <Stack spacing={0} sx={{ lineHeight: 1.2, py: 0.5 }}>
+            <span>{formatCurrency(params.row.sale_price)}</span>
+            {wholesale > 0 && (
+              <Typography variant="caption" color="success.main" fontWeight={700}>
+                {formatCurrency(wholesale)} {tr('dès')} {minQty}
+              </Typography>
+            )}
+          </Stack>
+        );
+      },
     },
     {
       field: 'total_stock',
-      headerName: 'Stock',
-      width: 110,
+      headerName: tr('Stock'),
+      width: 140,
       renderCell: (params) => {
         const qty = Number(params.value || 0);
-        const min = Number(params.row.min_stock || 0);
+        const raw = (params.row.stock_status || resolveStockStatus(qty, params.row.min_stock)) as StockStatus;
+        const status: StockStatus = raw in STOCK_STATUS_LABELS ? raw : resolveStockStatus(qty, params.row.min_stock);
         return (
           <Chip
             size="small"
-            label={qty}
-            color={qty <= 0 ? 'error' : qty <= min ? 'warning' : 'success'}
+            label={`${formatNumber(qty)} · ${tr(STOCK_STATUS_LABELS[status])}`}
+            color={STOCK_STATUS_COLORS[status]}
             variant="outlined"
           />
         );
@@ -106,17 +127,17 @@ export default function ProductsPage() {
         action={
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => navigate('/products/import')}>
-              Importer
+              {tr('Importer')}
             </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setDialogOpen(true); }}>
-              Nouveau produit
+              {tr('Nouveau produit')}
             </Button>
           </Stack>
         }
       />
 
       <TextField
-        placeholder="Rechercher un produit..."
+        placeholder={tr('Rechercher un produit...')}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         sx={{ mb: 2, maxWidth: 400 }}

@@ -24,8 +24,12 @@ import {
 } from '../api/expenses';
 import { getApiErrorMessage } from '../api/client';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 export default function ExpensesPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [rows, setRows] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +49,7 @@ export default function ExpensesPage() {
 
   const save = async () => {
     setError(null);
-    if (!form.amount) { setError('Le montant est obligatoire.'); return; }
+    if (!form.amount) { setError(tr('Le montant est obligatoire.')); return; }
     setSaving(true);
     try {
       let categoryId = form.category;
@@ -53,7 +57,7 @@ export default function ExpensesPage() {
         const cat = await createExpenseCategory(form.newCategory);
         categoryId = cat.id;
       }
-      if (!categoryId) { setError('Choisissez ou créez une catégorie.'); setSaving(false); return; }
+      if (!categoryId) { setError(tr('Choisissez ou créez une catégorie.')); setSaving(false); return; }
       await createExpense({
         category: Number(categoryId),
         amount: form.amount,
@@ -71,16 +75,16 @@ export default function ExpensesPage() {
   };
 
   const columns: GridColDef<Expense>[] = [
-    { field: 'date', headerName: 'Date', width: 130, valueFormatter: (v) => formatDate(v) },
-    { field: 'category_name', headerName: 'Catégorie', width: 180 },
-    { field: 'description', headerName: 'Description', flex: 1, minWidth: 200 },
-    { field: 'amount', headerName: 'Montant', width: 150, valueFormatter: (v) => formatCurrency(v) },
+    { field: 'date', headerName: tr('Date'), width: 130, valueFormatter: (v) => formatDate(v) },
+    { field: 'category_name', headerName: tr('Catégorie'), width: 180 },
+    { field: 'description', headerName: tr('Description'), flex: 1, minWidth: 200 },
+    { field: 'amount', headerName: tr('Montant'), width: 150, valueFormatter: (v) => formatCurrency(v) },
   ];
 
   return (
     <Box>
-      <PageHeader title="Dépenses" subtitle={`${rows.length} dépense(s)`}
-        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setError(null); setOpen(true); }}>Nouvelle dépense</Button>} />
+      <PageHeader title={tr('Dépenses')} subtitle={tr(`${rows.length} dépense(s)`)}
+        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setError(null); setOpen(true); }}>{tr('Nouvelle dépense')}</Button>} />
 
       <Box sx={{ height: 560, bgcolor: 'background.paper', borderRadius: 2 }}>
         <DataGrid rows={rows} columns={columns} loading={loading} disableRowSelectionOnClick
@@ -88,30 +92,30 @@ export default function ExpensesPage() {
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Nouvelle dépense</DialogTitle>
+        <DialogTitle>{tr('Nouvelle dépense')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
-            <TextField select label="Catégorie" value={form.category}
+            <TextField select label={tr('Catégorie')} value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value ? Number(e.target.value) : '' })} fullWidth>
-              <MenuItem value="">— Nouvelle catégorie —</MenuItem>
+              <MenuItem value="">{tr('— Nouvelle catégorie —')}</MenuItem>
               {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </TextField>
             {!form.category && (
-              <TextField label="Nom de la nouvelle catégorie" value={form.newCategory}
+              <TextField label={tr('Nom de la nouvelle catégorie')} value={form.newCategory}
                 onChange={(e) => setForm({ ...form, newCategory: e.target.value })} fullWidth />
             )}
-            <TextField label="Montant" type="number" value={form.amount}
+            <TextField label={tr('Montant')} type="number" value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })} fullWidth />
-            <TextField label="Date" type="date" value={form.date}
+            <TextField label={tr('Date')} type="date" value={form.date}
               onChange={(e) => setForm({ ...form, date: e.target.value })} fullWidth InputLabelProps={{ shrink: true }} />
-            <TextField label="Description" value={form.description}
+            <TextField label={tr('Description')} value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })} fullWidth multiline rows={2} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpen(false)}>Annuler</Button>
-          <Button variant="contained" onClick={save} disabled={saving}>Enregistrer</Button>
+          <Button onClick={() => setOpen(false)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={save} disabled={saving}>{tr('Enregistrer')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

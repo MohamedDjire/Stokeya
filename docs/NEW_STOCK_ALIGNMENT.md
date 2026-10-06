@@ -1,10 +1,10 @@
 # Alignement avec new_stock
 
-Ce document résume la logique reprise du projet `new_stock` et son adaptation dans Inventra.
+Ce document résume la logique reprise du projet `new_stock` et son adaptation dans Stokeya.
 
 ## Architecture reprise
 
-| new_stock | Inventra |
+| new_stock | Stokeya |
 |-----------|----------|
 | Vue 3 + Pinia | React Native + Redux |
 | PHP API monolithique | Django REST API modulaire |
@@ -29,9 +29,9 @@ Ce document résume la logique reprise du projet `new_stock` et son adaptation d
 
 ## Stock (logique reprise)
 
-Endpoints Inventra équivalents :
+Endpoints Stokeya équivalents :
 
-| new_stock | Inventra |
+| new_stock | Stokeya |
 |-----------|----------|
 | `etat_stock` | `GET /api/v1/stock/status/{warehouse_id}/` |
 | `mouvements_stock` | `GET /api/v1/stock/movements/{warehouse_id}/` |

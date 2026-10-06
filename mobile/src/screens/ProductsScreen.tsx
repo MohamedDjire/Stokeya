@@ -1,44 +1,50 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, RefreshControl, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Appbar, Avatar, Card, FAB, Searchbar, Text, Chip } from 'react-native-paper';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AppHeader from '../components/AppHeader';
+import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { fetchProducts, type Product } from '../api/auth';
+import { cachePeek } from '../api/cache';
 import { colors, spacing } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/types';
 
 export default function ProductsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => cachePeek<Product[]>('products:') ?? []);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !(cachePeek('products:')?.length));
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadProducts = useCallback(async (query?: string) => {
-    setProducts(await fetchProducts(query));
+  const loadProducts = useCallback(async (query?: string, silent = false) => {
+    if (!silent && !(cachePeek(`products:${query || ''}`) as Product[] | undefined)?.length) {
+      setLoading(true);
+    }
+    try {
+      setProducts(await fetchProducts(query));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadProducts().finally(() => setLoading(false));
-  }, [loadProducts]);
+    const t = setTimeout(() => {
+      void loadProducts(search.trim() || undefined, true);
+    }, search ? 280 : 0);
+    return () => clearTimeout(t);
+  }, [search, loadProducts]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProducts(search.trim() || undefined);
-    }, [loadProducts, search]),
-  );
-
-  const handleSearch = async (value: string) => {
+  const handleSearch = (value: string) => {
     setSearch(value);
-    await loadProducts(value.trim() || undefined);
   };
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.Content title="Produits" subtitle={`${products.length} article(s)`} />
         <Appbar.Action icon="file-import" onPress={() => navigation.navigate('ProductImport')} />
-      </Appbar.Header>
+      </AppHeader>
 
       <Searchbar
         placeholder="Rechercher un produit..."
@@ -82,9 +88,14 @@ export default function ProductsScreen() {
                   <View style={styles.cardHeader}>
                     <Text variant="titleMedium" style={styles.productName}>{item.name}</Text>
                     <Chip compact style={styles.priceChip}>
-                      {Number(item.sale_price).toLocaleString('fr-FR')} XOF
+                      {Number(item.sale_price).toLocaleString('fr-FR')} F
                     </Chip>
                   </View>
+                  {Number(item.wholesale_price || 0) > 0 && (
+                    <Text variant="labelSmall" style={{ color: '#2E7D32', fontWeight: '700' }}>
+                      Gros {Number(item.wholesale_price).toLocaleString('fr-FR')} F dès {Number(item.wholesale_min_qty || 10)}
+                    </Text>
+                  )}
                   <Text variant="bodySmall" style={styles.meta}>
                     SKU: {item.sku || '—'} · Stock: {item.total_stock} · {item.unit_name}
                   </Text>

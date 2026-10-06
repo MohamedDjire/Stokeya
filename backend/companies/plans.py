@@ -1,70 +1,82 @@
-"""Catalogue des fonctionnalités et définition des packs Inventra.
+"""Catalogue des fonctionnalités et définition des packs Stokeya.
 
 Les fonctionnalités « cœur » (produits, catégories, stock, ventes simples,
 clients, fournisseurs, tableau de bord, ticket, sauvegarde) sont disponibles
 sur TOUS les packs et ne sont donc pas listées ici.
 
-Ce fichier ne liste que les fonctionnalités « premium » qui s'activent /
-désactivent selon le pack. Le code `all` sur un pack débloque tout.
+Business = fonctionnalités premium intégrées.
+Enterprise = Business + avantages exclusifs (échelle illimitée, accompagnement).
 """
 
-# --- Codes de fonctionnalités premium ---
+# --- Codes de fonctionnalités premium (intégrées) ---
 FEATURE_BARCODE_SCANNER = 'barcode_scanner'
 FEATURE_MULTI_BRANCH = 'multi_branch'
+FEATURE_MULTI_WAREHOUSE = 'multi_warehouse'
+FEATURE_ONLINE_SHOP = 'online_shop'
 FEATURE_ROLES_PERMISSIONS = 'roles_permissions'
 FEATURE_ADVANCED_PURCHASES = 'advanced_purchases'
-FEATURE_CUSTOMER_CREDIT = 'customer_credit'
-FEATURE_SUPPLIER_PAYMENTS = 'supplier_payments'
 FEATURE_ADVANCED_REPORTS = 'advanced_reports'
 FEATURE_EXPORT = 'export_excel_pdf'
-FEATURE_PROMOTIONS = 'promotions'
-FEATURE_NOTIFICATIONS_WHATSAPP = 'notifications_whatsapp'
 FEATURE_POS_ADVANCED = 'pos_advanced'
-FEATURE_MULTI_WAREHOUSE = 'multi_warehouse'
-FEATURE_HR_ADVANCED = 'hr_advanced'
-FEATURE_ACCOUNTING = 'accounting'
-FEATURE_AI_FORECASTING = 'ai_forecasting'
+FEATURE_CUSTOMER_CREDIT = 'customer_credit'
+
+# --- Exclusifs Pack Enterprise (10 000 F) ---
+FEATURE_UNLIMITED_SCALE = 'unlimited_scale'
+FEATURE_PRIORITY_SUPPORT = 'priority_support'
+FEATURE_DEDICATED_ONBOARDING = 'dedicated_onboarding'
 FEATURE_API_ACCESS = 'api_access'
 FEATURE_CUSTOM_APP = 'custom_app'
-FEATURE_PRIORITY_SUPPORT = 'priority_support'
+
+# Réservés pour plus tard :
+# supplier_payments, promotions, notifications_whatsapp,
+# hr_advanced, accounting, ai_forecasting
 
 FEATURE_LABELS = {
     FEATURE_BARCODE_SCANNER: 'Scanner code-barres',
-    FEATURE_MULTI_BRANCH: 'Multi-boutiques',
+    FEATURE_MULTI_BRANCH: 'Multi-boutiques / points de vente',
+    FEATURE_MULTI_WAREHOUSE: 'Gestion multi-entrepôts',
+    FEATURE_ONLINE_SHOP: 'Boutique en ligne',
     FEATURE_ROLES_PERMISSIONS: 'Rôles et permissions',
     FEATURE_ADVANCED_PURCHASES: 'Gestion des achats avancée',
-    FEATURE_CUSTOMER_CREDIT: 'Gestion des dettes clients',
-    FEATURE_SUPPLIER_PAYMENTS: 'Paiements fournisseurs',
     FEATURE_ADVANCED_REPORTS: 'Rapports avancés',
     FEATURE_EXPORT: 'Export Excel / PDF',
-    FEATURE_PROMOTIONS: 'Promotions et réductions',
-    FEATURE_NOTIFICATIONS_WHATSAPP: 'Notifications WhatsApp / email',
     FEATURE_POS_ADVANCED: 'Point de vente complet',
-    FEATURE_MULTI_WAREHOUSE: 'Gestion multi-entrepôts',
-    FEATURE_HR_ADVANCED: 'Gestion avancée des employés',
-    FEATURE_ACCOUNTING: 'Comptabilité avancée',
-    FEATURE_AI_FORECASTING: 'Intelligence artificielle (prévisions)',
-    FEATURE_API_ACCESS: 'Accès API développeur',
-    FEATURE_CUSTOM_APP: 'Application personnalisée',
+    FEATURE_CUSTOMER_CREDIT: 'Dettes clients',
+    # Enterprise only (visibles via features=['all'])
+    FEATURE_UNLIMITED_SCALE: 'Utilisateurs, boutiques, entrepôts et produits illimités',
     FEATURE_PRIORITY_SUPPORT: 'Assistance prioritaire',
+    FEATURE_DEDICATED_ONBOARDING: 'Accompagnement et formation dédiés',
+    FEATURE_API_ACCESS: 'Accès API & intégrations',
+    FEATURE_CUSTOM_APP: 'Personnalisation avancée (marque / besoins)',
 }
 
 _BUSINESS_FEATURES = [
     FEATURE_BARCODE_SCANNER,
     FEATURE_MULTI_BRANCH,
+    FEATURE_MULTI_WAREHOUSE,
+    FEATURE_ONLINE_SHOP,
     FEATURE_ROLES_PERMISSIONS,
     FEATURE_ADVANCED_PURCHASES,
-    FEATURE_CUSTOMER_CREDIT,
-    FEATURE_SUPPLIER_PAYMENTS,
     FEATURE_ADVANCED_REPORTS,
     FEATURE_EXPORT,
-    FEATURE_PROMOTIONS,
-    FEATURE_NOTIFICATIONS_WHATSAPP,
     FEATURE_POS_ADVANCED,
+    FEATURE_CUSTOMER_CREDIT,
 ]
+
+_ENTERPRISE_EXTRA = [
+    FEATURE_UNLIMITED_SCALE,
+    FEATURE_PRIORITY_SUPPORT,
+    FEATURE_DEDICATED_ONBOARDING,
+    FEATURE_API_ACCESS,
+    FEATURE_CUSTOM_APP,
+]
+
+ENTERPRISE_FEATURES = [*_BUSINESS_FEATURES, *_ENTERPRISE_EXTRA]
 
 # --- Définition des packs ---
 # max_* = 0 signifie illimité.
+# max_branches = plafond de points de vente (hors siège).
+# max_warehouses = plafond d'entrepôts de stockage (is_pos_stock=False).
 PLAN_DEFINITIONS = [
     {
         'code': 'trial',
@@ -73,8 +85,9 @@ PLAN_DEFINITIONS = [
         'price_annual': 0,
         'max_users': 1,
         'max_branches': 1,
+        'max_warehouses': 1,
         'max_products': 50,
-        'features': _BUSINESS_FEATURES,  # essai = accès Business pour tester
+        'features': list(_BUSINESS_FEATURES),
         'is_public': False,
     },
     {
@@ -83,8 +96,11 @@ PLAN_DEFINITIONS = [
         'price': 3000,
         'price_annual': 30000,
         'max_users': 1,
+        # 1 boutique principale + 1 entrepôt (stock de la boutique) — pas illimité.
         'max_branches': 1,
+        'max_warehouses': 1,
         'max_products': 1000,
+        # Boutique principale = POS + stock uniquement (pas multi-POS / boutique en ligne).
         'features': [],
         'is_public': True,
     },
@@ -94,7 +110,8 @@ PLAN_DEFINITIONS = [
         'price': 5000,
         'price_annual': 50000,
         'max_users': 5,
-        'max_branches': 3,
+        'max_branches': 5,
+        'max_warehouses': 3,
         'max_products': 10000,
         'features': list(_BUSINESS_FEATURES),
         'is_public': True,
@@ -106,8 +123,10 @@ PLAN_DEFINITIONS = [
         'price_annual': 100000,
         'max_users': 0,
         'max_branches': 0,
+        'max_warehouses': 0,
         'max_products': 0,
-        'features': ['all'],
+        # Liste explicite : tout Business + exclusifs Enterprise.
+        'features': list(ENTERPRISE_FEATURES),
         'is_public': True,
     },
 ]
@@ -127,6 +146,7 @@ def seed_plans():
                 'price_annual': definition['price_annual'],
                 'max_users': definition['max_users'],
                 'max_branches': definition['max_branches'],
+                'max_warehouses': definition['max_warehouses'],
                 'max_products': definition['max_products'],
                 'features': definition['features'],
                 'is_public': definition['is_public'],

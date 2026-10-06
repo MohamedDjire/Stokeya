@@ -20,14 +20,15 @@ export default function MainTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.secondary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 4,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 6,
+          elevation: 12,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}

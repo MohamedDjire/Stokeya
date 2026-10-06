@@ -78,7 +78,10 @@ def create_sale(
         if quantity <= 0:
             raise SaleError('Quantité invalide.')
 
-        unit_price = Decimal(str(item.get('unit_price', product.sale_price)))
+        if item.get('unit_price') not in (None, ''):
+            unit_price = Decimal(str(item['unit_price']))
+        else:
+            unit_price = product.unit_price_for_qty(quantity)
         tax_rate = Decimal(str(item.get('tax_rate', product.tax_rate)))
         line_discount = Decimal(str(item.get('discount', 0)))
         line_subtotal = (unit_price * quantity) - line_discount
@@ -100,6 +103,21 @@ def create_sale(
     if total < 0:
         total = Decimal('0')
 
+    is_credit = payment_method == PaymentMethod.CREDIT
+    is_mobile = payment_method == PaymentMethod.MOBILE_MONEY
+
+    if is_credit:
+        from customers.credit import CreditError, validate_credit_sale
+        try:
+            validate_credit_sale(company=company, customer=customer, total=total)
+        except CreditError as exc:
+            raise SaleError(str(exc)) from exc
+
+    if is_credit or is_mobile:
+        sale_payment_status = PaymentStatus.UNPAID
+    else:
+        sale_payment_status = PaymentStatus.PAID
+
     now = timezone.now()
     sale = Sale.objects.create(
         company=company,
@@ -109,10 +127,7 @@ def create_sale(
         seller=seller,
         reference=_generate_reference(company),
         status=SaleStatus.COMPLETED,
-        payment_status=(
-            PaymentStatus.UNPAID if payment_method == PaymentMethod.MOBILE_MONEY
-            else PaymentStatus.PAID
-        ),
+        payment_status=sale_payment_status,
         subtotal=subtotal,
         tax_amount=tax_amount,
         discount_amount=Decimal(str(discount_amount)),
@@ -137,16 +152,66 @@ def create_sale(
         except StockError as exc:
             raise SaleError(str(exc)) from exc
 
-    payment_status = 'completed'
-    if payment_method == PaymentMethod.MOBILE_MONEY:
-        payment_status = 'pending'
+    if is_credit:
+        payment_row_status = 'credit'
+    elif is_mobile:
+        payment_row_status = 'pending'
+    else:
+        payment_row_status = 'completed'
 
     Payment.objects.create(
         sale=sale,
         method=payment_method,
         amount=total,
         reference=sale.reference,
-        status=payment_status,
+        status=payment_row_status,
     )
+
+    if is_credit and customer:
+        from customers.credit import increase_customer_debt
+        increase_customer_debt(company=company, customer=customer, total=total)
+        sale_id = sale.pk
+        cust_name = customer.name
+        ref = sale.reference
+        tot = str(total)
+
+        def _notify_credit():
+            from notifications.models import NotificationType
+            from notifications.services import notify_company
+            try:
+                notify_company(
+                    company,
+                    notification_type=NotificationType.SALE,
+                    title='Vente à crédit',
+                    message=f'{ref} — {cust_name} · {tot} F',
+                    data={'sale_id': sale_id, 'reference': ref, 'link': '/customers'},
+                )
+            except Exception:
+                pass
+
+        transaction.on_commit(_notify_credit)
+
+    if customer:
+        from customers.services import award_loyalty_points, refresh_customer_stats
+        if payment_row_status == 'completed':
+            award_loyalty_points(
+                customer, total, reference=sale.reference, reason='Vente POS', user=seller,
+            )
+        refresh_customer_stats(customer)
+
+    # Réapprovisionnement automatique si stock faible après vente
+    try:
+        prefs = company.get_preferences() if hasattr(company, 'get_preferences') else {}
+        auto = (prefs.get('automation') or {}).get('low_stock_auto_request', True)
+        if auto:
+            from inventory.services import ensure_auto_low_stock_after_sale
+            ensure_auto_low_stock_after_sale(
+                company=company,
+                warehouse=warehouse,
+                product_ids=[item['product'].id for item in sale_items],
+                user=seller,
+            )
+    except Exception:
+        pass
 
     return sale

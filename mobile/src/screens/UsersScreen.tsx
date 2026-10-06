@@ -13,6 +13,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import {
   createUser,
   fetchRoles,
@@ -81,11 +82,11 @@ export default function UsersScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Utilisateurs" subtitle={`${users.length} compte(s)`} />
         <Appbar.Action icon={showForm ? 'close' : 'account-plus'} onPress={() => setShowForm(!showForm)} />
-      </Appbar.Header>
+      </AppHeader>
 
       {showForm && (
         <Card style={styles.formCard}>

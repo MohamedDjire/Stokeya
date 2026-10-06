@@ -41,11 +41,16 @@ import {
   type AnalyticsFilters,
 } from '../api/reports';
 import { CHART_COLORS } from '../theme';
-import { compact, formatCurrency } from '../utils/format';
+import { compact, formatCurrency, formatNumber } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
+import { tr as trPhrase } from '../locale/tr';
 
 type Period = 'week' | 'month' | 'year';
 
 export default function ReportsPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [period, setPeriod] = useState<Period>('month');
   const [branch, setBranch] = useState<number | ''>('');
   const [seller, setSeller] = useState<number | ''>('');
@@ -101,8 +106,8 @@ export default function ReportsPage() {
   return (
     <Box>
       <PageHeader
-        title="Statistiques"
-        subtitle="Analyse de performance"
+        title={tr('Statistiques')}
+        subtitle={tr('Analyse de performance')}
         action={
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={exportPdf} disabled={!data}>
@@ -117,21 +122,21 @@ export default function ReportsPage() {
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems="center">
         <ToggleButtonGroup exclusive size="small" value={period} onChange={(_, v) => v && setPeriod(v)}>
-          <ToggleButton value="week">7 jours</ToggleButton>
-          <ToggleButton value="month">30 jours</ToggleButton>
-          <ToggleButton value="year">Année</ToggleButton>
+          <ToggleButton value="week">{tr('7 jours')}</ToggleButton>
+          <ToggleButton value="month">{tr('30 jours')}</ToggleButton>
+          <ToggleButton value="year">{tr('Année')}</ToggleButton>
         </ToggleButtonGroup>
         {filters.branches.length > 1 && (
-          <TextField select size="small" label="Boutique" value={branch}
+          <TextField select size="small" label={tr('Boutique')} value={branch}
             onChange={(e) => setBranch(e.target.value ? Number(e.target.value) : '')} sx={{ minWidth: 180 }}>
-            <MenuItem value="">Toutes boutiques</MenuItem>
+            <MenuItem value="">{tr('Toutes boutiques')}</MenuItem>
             {filters.branches.map((b) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
           </TextField>
         )}
         {filters.sellers.length > 1 && (
-          <TextField select size="small" label="Vendeur" value={seller}
+          <TextField select size="small" label={tr('Vendeur')} value={seller}
             onChange={(e) => setSeller(e.target.value ? Number(e.target.value) : '')} sx={{ minWidth: 180 }}>
-            <MenuItem value="">Tous vendeurs</MenuItem>
+            <MenuItem value="">{tr('Tous vendeurs')}</MenuItem>
             {filters.sellers.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
         )}
@@ -143,35 +148,37 @@ export default function ReportsPage() {
         <>
           <Grid container spacing={2} sx={{ mb: 1 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StatCard label="Chiffre d'affaires" value={formatCurrency(data.kpis.revenue)} growth={data.kpis.revenue_growth} />
+              <StatCard label={tr("Chiffre d'affaires")} value={formatCurrency(data.kpis.revenue)} growth={data.kpis.revenue_growth} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StatCard label="Ventes" value={data.kpis.sales_count} growth={data.kpis.sales_growth} color="#00897B" />
+              <StatCard label={tr('Ventes')} value={data.kpis.sales_count} growth={data.kpis.sales_growth} color="#0F766E" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StatCard label="Panier moyen" value={formatCurrency(data.kpis.average_basket)} color="#FF6F00" />
+              <StatCard label={tr('Panier moyen')} value={formatCurrency(data.kpis.average_basket)} color="#FF6F00" />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <StatCard label="Produits actifs" value={data.kpis.active_products} color="#8E24AA" />
+              <StatCard label={tr('Produits actifs')} value={data.kpis.active_products} color="#8E24AA" />
             </Grid>
           </Grid>
 
           {data.low_stock_count > 0 && (
-            <Alert severity="warning" sx={{ my: 2 }}>{data.low_stock_count} produit(s) en stock faible.</Alert>
+            <Alert severity="warning" sx={{ my: 2 }}>
+              {tr(`${data.low_stock_count} produit(s) en alerte stock (stock faible ou rupture) — voir le tableau de bord et la page Stock.`)}
+            </Alert>
           )}
 
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid size={{ xs: 12, md: 8 }}>
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>Évolution du chiffre d'affaires</Typography>
+                  <Typography variant="h6" gutterBottom>{tr("Évolution du chiffre d'affaires")}</Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F5" />
                       <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis tickFormatter={compact} fontSize={12} tickLine={false} axisLine={false} width={45} />
                       <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                      <Line type="monotone" dataKey="revenue" name="CA" stroke="#1565C0" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="revenue" name={tr('CA')} stroke="#0D9488" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -181,7 +188,7 @@ export default function ReportsPage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>Modes de paiement</Typography>
+                  <Typography variant="h6" gutterBottom>{tr('Modes de paiement')}</Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
@@ -207,7 +214,7 @@ export default function ReportsPage() {
             <Grid size={{ xs: 12, md: 8 }}>
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>Recettes vs Dépenses (6 mois)</Typography>
+                  <Typography variant="h6" gutterBottom>{tr('Recettes vs Dépenses (6 mois)')}</Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={reData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F5" />
@@ -215,8 +222,8 @@ export default function ReportsPage() {
                       <YAxis tickFormatter={compact} fontSize={12} tickLine={false} axisLine={false} width={45} />
                       <Tooltip formatter={(v: number) => formatCurrency(v)} />
                       <Legend />
-                      <Line type="monotone" dataKey="Recettes" stroke="#2E7D32" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="Dépenses" stroke="#C62828" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Recettes" name={tr('Recettes')} stroke="#2E7D32" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="Dépenses" name={tr('Dépenses')} stroke="#C62828" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -226,13 +233,13 @@ export default function ReportsPage() {
             <Grid size={{ xs: 12, md: 4 }}>
               <Card sx={{ height: '100%' }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>CA par catégorie</Typography>
+                  <Typography variant="h6" gutterBottom>{tr('CA par catégorie')}</Typography>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={data.category_breakdown} layout="vertical" margin={{ left: 10 }}>
                       <XAxis type="number" tickFormatter={compact} fontSize={12} hide />
                       <YAxis type="category" dataKey="name" fontSize={12} width={90} tickLine={false} axisLine={false} />
                       <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                      <Bar dataKey="revenue" fill="#00897B" radius={[0, 6, 6, 0]} name="CA" />
+                      <Bar dataKey="revenue" fill="#0F766E" radius={[0, 6, 6, 0]} name={tr('CA')} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -242,9 +249,9 @@ export default function ReportsPage() {
             <Grid size={{ xs: 12 }}>
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>Top produits</Typography>
+                  <Typography variant="h6" gutterBottom>{tr('Top produits')}</Typography>
                   {data.top_products.length === 0 ? (
-                    <Typography color="text.secondary" variant="body2">Aucune vente sur la période.</Typography>
+                    <Typography color="text.secondary" variant="body2">{tr('Aucune vente sur la période.')}</Typography>
                   ) : (
                     data.top_products.map((p, i) => {
                       const max = data.top_products[0].revenue || 1;
@@ -270,29 +277,33 @@ export default function ReportsPage() {
 }
 
 function buildReportHtml(d: Analytics): string {
-  const periodLabel = d.period === 'week' ? '7 derniers jours' : d.period === 'year' ? 'Année en cours' : '30 derniers jours';
-  const money = (n: number) => `${Number(n).toLocaleString('fr-FR')} XOF`;
+  const periodLabel = d.period === 'week'
+    ? trPhrase('7 derniers jours')
+    : d.period === 'year'
+      ? trPhrase('Année en cours')
+      : trPhrase('30 derniers jours');
+  const money = (n: number) => formatCurrency(n);
   const row = (cells: (string | number)[], tag = 'td') =>
     `<tr>${cells.map((c) => `<${tag}>${c}</${tag}>`).join('')}</tr>`;
-  const trendRows = d.sales_trend.labels.map((l, i) => row([l, money(d.sales_trend.revenue[i]), d.sales_trend.counts[i]])).join('');
+  const trendRows = d.sales_trend.labels.map((l, i) => row([l, money(d.sales_trend.revenue[i]), formatNumber(d.sales_trend.counts[i])])).join('');
   const reRows = d.revenue_vs_expenses.labels.map((l, i) => row([l, money(d.revenue_vs_expenses.revenue[i]), money(d.revenue_vs_expenses.expenses[i]), money(d.revenue_vs_expenses.profit[i])])).join('');
-  const topRows = d.top_products.map((p) => row([p.name, p.quantity, money(p.revenue)])).join('');
-  return `<html><head><meta charset="utf-8"/><title>Rapport Inventra</title><style>
+  const topRows = d.top_products.map((p) => row([p.name, formatNumber(p.quantity), money(p.revenue)])).join('');
+  return `<html><head><meta charset="utf-8"/><title>${trPhrase('Rapport Stokeya')}</title><style>
     body{font-family:Arial,sans-serif;color:#1A1A2E;padding:24px}
-    h1{color:#1565C0}h2{color:#1565C0;font-size:15px;border-bottom:2px solid #E5E7EB;padding-bottom:4px;margin-top:24px}
+    h1{color:#0D9488}h2{color:#0D9488;font-size:15px;border-bottom:2px solid #E5E7EB;padding-bottom:4px;margin-top:24px}
     table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-    th{background:#1565C0;color:#fff;padding:6px;text-align:left}td{padding:6px;border-bottom:1px solid #E5E7EB}
+    th{background:#0D9488;color:#fff;padding:6px;text-align:left}td{padding:6px;border-bottom:1px solid #E5E7EB}
     .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.kpi{background:#F0F4F8;border-radius:8px;padding:12px;flex:1;min-width:130px}
     .v{font-size:18px;font-weight:700}.l{color:#6B7280;font-size:11px}</style></head><body>
-    <h1>Rapport statistique — Inventra</h1><p class="l">Période : ${periodLabel}</p>
+    <h1>${trPhrase('Rapport statistique — Stokeya')}</h1><p class="l">${trPhrase('Période')} : ${periodLabel}</p>
     <div class="kpis">
-      <div class="kpi"><div class="l">Chiffre d'affaires</div><div class="v">${money(d.kpis.revenue)}</div></div>
-      <div class="kpi"><div class="l">Ventes</div><div class="v">${d.kpis.sales_count}</div></div>
-      <div class="kpi"><div class="l">Panier moyen</div><div class="v">${money(d.kpis.average_basket)}</div></div>
-      <div class="kpi"><div class="l">Produits actifs</div><div class="v">${d.kpis.active_products}</div></div>
+      <div class="kpi"><div class="l">${trPhrase("Chiffre d'affaires")}</div><div class="v">${money(d.kpis.revenue)}</div></div>
+      <div class="kpi"><div class="l">${trPhrase('Ventes')}</div><div class="v">${formatNumber(d.kpis.sales_count)}</div></div>
+      <div class="kpi"><div class="l">${trPhrase('Panier moyen')}</div><div class="v">${money(d.kpis.average_basket)}</div></div>
+      <div class="kpi"><div class="l">${trPhrase('Produits actifs')}</div><div class="v">${formatNumber(d.kpis.active_products)}</div></div>
     </div>
-    <h2>Évolution du chiffre d'affaires</h2><table>${row(['Période', 'CA', 'Ventes'], 'th')}${trendRows}</table>
-    <h2>Recettes vs Dépenses</h2><table>${row(['Mois', 'Recettes', 'Dépenses', 'Bénéfice'], 'th')}${reRows}</table>
-    <h2>Top produits</h2><table>${row(['Produit', 'Qté', 'CA'], 'th')}${topRows || row(['Aucune vente', '', ''])}</table>
+    <h2>${trPhrase("Évolution du chiffre d'affaires")}</h2><table>${row([trPhrase('Période'), trPhrase('CA'), trPhrase('Ventes')], 'th')}${trendRows}</table>
+    <h2>${trPhrase('Recettes vs Dépenses')}</h2><table>${row([trPhrase('Mois'), trPhrase('Recettes'), trPhrase('Dépenses'), trPhrase('Bénéfice')], 'th')}${reRows}</table>
+    <h2>${trPhrase('Top produits')}</h2><table>${row([trPhrase('Produit'), trPhrase('Qté'), trPhrase('CA')], 'th')}${topRows || row([trPhrase('Aucune vente'), '', ''])}</table>
   </body></html>`;
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Searchbar, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { createSupplier, fetchSuppliers, type Supplier } from '../api/suppliers';
 import { colors, spacing } from '../theme/colors';
@@ -39,11 +40,11 @@ export default function SuppliersScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Fournisseurs" subtitle={`${suppliers.length} fournisseur(s)`} />
         <Appbar.Action icon="plus" onPress={() => setShowForm(!showForm)} />
-      </Appbar.Header>
+      </AppHeader>
 
       {showForm && (
         <View style={styles.form}>

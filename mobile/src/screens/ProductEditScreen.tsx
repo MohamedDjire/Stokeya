@@ -14,6 +14,7 @@ import {
 import { deleteProduct, updateProduct, uploadProductImage } from '../api/products';
 import type { AppStackParamList } from '../navigation/types';
 import { colors, spacing } from '../theme/colors';
+import { previewWholesalePrice, type WholesaleDiscountType } from '../utils/pricing';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ProductEdit'>;
 
@@ -48,6 +49,10 @@ export default function ProductEditScreen({ navigation, route }: Props) {
     name: '', sku: '', description: '', category: null as number | null,
     category_name: '', brand: null as number | null, brand_name: '',
     unit: null as number | null, unit_name: '', purchase_price: '', sale_price: '',
+    wholesale_min_qty: '10',
+    wholesale_discount_type: 'price' as WholesaleDiscountType,
+    wholesale_discount_value: '',
+    wholesale_price: '',
     tax_rate: '0', min_stock: '0', max_stock: '', barcode: '', track_batches: false,
   });
 
@@ -71,6 +76,10 @@ export default function ProductEditScreen({ navigation, route }: Props) {
             unit_name: product.unit_name,
             purchase_price: product.purchase_price,
             sale_price: product.sale_price,
+            wholesale_min_qty: String(product.wholesale_min_qty ?? '10'),
+            wholesale_discount_type: (product.wholesale_discount_type || 'price') as WholesaleDiscountType,
+            wholesale_discount_value: product.wholesale_discount_value || '',
+            wholesale_price: product.wholesale_price || '',
             tax_rate: product.tax_rate,
             min_stock: product.min_stock,
             max_stock: product.max_stock || '',
@@ -106,6 +115,10 @@ export default function ProductEditScreen({ navigation, route }: Props) {
         unit: form.unit,
         purchase_price: form.purchase_price || '0',
         sale_price: form.sale_price,
+        wholesale_min_qty: form.wholesale_min_qty || '10',
+        wholesale_discount_type: form.wholesale_discount_type,
+        wholesale_discount_value: form.wholesale_discount_value || null,
+        wholesale_price: form.wholesale_discount_type === 'price' ? (form.wholesale_price || null) : null,
         tax_rate: form.tax_rate || '0',
         min_stock: form.min_stock || '0',
         max_stock: form.max_stock || null,
@@ -153,7 +166,39 @@ export default function ProductEditScreen({ navigation, route }: Props) {
       </View>
 
       <TextInput label="Nom" mode="outlined" style={styles.input} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} />
-      <TextInput label="Prix vente" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.sale_price} onChangeText={(v) => setForm({ ...form, sale_price: v })} />
+      <TextInput label="Prix détail (unité)" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.sale_price} onChangeText={(v) => setForm({ ...form, sale_price: v })} />
+      <Text variant="titleMedium" style={{ fontWeight: '800', marginBottom: 4, color: colors.primary }}>Prix de gros / promo</Text>
+      <TextInput label="À partir de (quantité)" keyboardType="number-pad" mode="outlined" style={styles.input} value={form.wholesale_min_qty} onChangeText={(v) => setForm({ ...form, wholesale_min_qty: v })} />
+      <MenuField
+        label="Type de promo"
+        value={form.wholesale_discount_type === 'percent' ? 'Réduction %' : form.wholesale_discount_type === 'amount' ? 'Réduction en F' : 'Nouveau prix unitaire'}
+        items={[
+          { id: 1, name: 'Nouveau prix unitaire' },
+          { id: 2, name: 'Réduction %' },
+          { id: 3, name: 'Réduction en F' },
+        ]}
+        onSelect={(i) => setForm({
+          ...form,
+          wholesale_discount_type: i.id === 2 ? 'percent' : i.id === 3 ? 'amount' : 'price',
+        })}
+      />
+      {form.wholesale_discount_type === 'price' ? (
+        <TextInput label="Prix de gros (unitaire)" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.wholesale_price} onChangeText={(v) => setForm({ ...form, wholesale_price: v })} />
+      ) : (
+        <TextInput
+          label={form.wholesale_discount_type === 'percent' ? 'Réduction (%)' : 'Réduction (F par unité)'}
+          keyboardType="decimal-pad"
+          mode="outlined"
+          style={styles.input}
+          value={form.wholesale_discount_value}
+          onChangeText={(v) => setForm({ ...form, wholesale_discount_value: v })}
+        />
+      )}
+      {(() => {
+        const preview = previewWholesalePrice(form.sale_price, form.wholesale_discount_type, form.wholesale_discount_value, form.wholesale_price);
+        if (!preview) return null;
+        return <Text style={{ color: '#2E7D32', fontWeight: '700', marginBottom: 12 }}>Gros dès {form.wholesale_min_qty || 10} : {preview.toLocaleString('fr-FR')} F</Text>;
+      })()}
       <TextInput label="Code-barres" mode="outlined" style={styles.input} value={form.barcode} onChangeText={(v) => setForm({ ...form, barcode: v })} />
       <MenuField label="Unité" value={form.unit_name} items={units} onSelect={(i) => setForm({ ...form, unit: i.id, unit_name: i.name })} />
       <Button mode="contained" onPress={handleSave} loading={saving} style={{ marginBottom: 8 }}>Enregistrer</Button>

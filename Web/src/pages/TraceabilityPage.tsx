@@ -30,11 +30,15 @@ import {
 } from '../api/batches';
 import { MOVEMENT_LABELS } from '../api/stock';
 import { getApiErrorMessage } from '../api/client';
-import { formatDate } from '../utils/format';
+import { formatDate, formatNumber } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 const batchEmpty = { batch_number: '', expiry_date: '', quantity: '' };
 
 export default function TraceabilityPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
   const [trace, setTrace] = useState<ProductTraceability | null>(null);
@@ -82,7 +86,7 @@ export default function TraceabilityPage() {
   const saveBatch = async () => {
     if (!selected) return;
     if (!batchForm.batch_number || !batchForm.quantity) {
-      setError('Numéro de lot et quantité sont obligatoires.');
+      setError(tr('Numéro de lot et quantité sont obligatoires.'));
       return;
     }
     setSaving(true);
@@ -105,40 +109,40 @@ export default function TraceabilityPage() {
   };
 
   const stockColumns: GridColDef[] = [
-    { field: 'branch_name', headerName: 'Magasin', width: 140 },
-    { field: 'warehouse_name', headerName: 'Entrepôt', flex: 1, minWidth: 160 },
-    { field: 'quantity', headerName: 'Quantité', width: 110 },
+    { field: 'branch_name', headerName: tr('Magasin'), width: 140 },
+    { field: 'warehouse_name', headerName: tr('Entrepôt'), flex: 1, minWidth: 160 },
+    { field: 'quantity', headerName: tr('Quantité'), width: 110, valueFormatter: (v) => formatNumber(v) },
   ];
 
   const batchColumns: GridColDef<Batch>[] = [
-    { field: 'batch_number', headerName: 'N° lot', width: 140 },
-    { field: 'quantity', headerName: 'Quantité', width: 100 },
-    { field: 'expiry_date', headerName: 'Expiration', width: 130, valueFormatter: (v) => formatDate(v) },
-    { field: 'created_at', headerName: 'Créé le', width: 130, valueFormatter: (v) => formatDate(v) },
+    { field: 'batch_number', headerName: tr('N° lot'), width: 140 },
+    { field: 'quantity', headerName: tr('Quantité'), width: 100, valueFormatter: (v) => formatNumber(v) },
+    { field: 'expiry_date', headerName: tr('Expiration'), width: 130, valueFormatter: (v) => formatDate(v) },
+    { field: 'created_at', headerName: tr('Créé le'), width: 130, valueFormatter: (v) => formatDate(v) },
   ];
 
   const movementColumns: GridColDef<TraceabilityMovement>[] = [
-    { field: 'created_at', headerName: 'Date', width: 130, valueFormatter: (v) => formatDate(v) },
-    { field: 'warehouse_name', headerName: 'Entrepôt', width: 150 },
+    { field: 'created_at', headerName: tr('Date'), width: 130, valueFormatter: (v) => formatDate(v) },
+    { field: 'warehouse_name', headerName: tr('Entrepôt'), width: 150 },
     {
-      field: 'movement_type', headerName: 'Type', width: 120,
+      field: 'movement_type', headerName: tr('Type'), width: 120,
       valueFormatter: (v) => MOVEMENT_LABELS[v] || v,
-      renderCell: (p) => <Chip size="small" label={MOVEMENT_LABELS[p.value] || p.value} variant="outlined" />,
+      renderCell: (p) => <Chip size="small" label={tr(MOVEMENT_LABELS[p.value] || p.value)} variant="outlined" />,
     },
-    { field: 'quantity', headerName: 'Qté', width: 80 },
-    { field: 'reference', headerName: 'Réf.', width: 110 },
-    { field: 'notes', headerName: 'Notes', flex: 1, minWidth: 140 },
-    { field: 'created_by', headerName: 'Par', width: 130, valueGetter: (v) => v || '—' },
+    { field: 'quantity', headerName: tr('Qté'), width: 80, valueFormatter: (v) => formatNumber(v) },
+    { field: 'reference', headerName: tr('Réf.'), width: 110 },
+    { field: 'notes', headerName: tr('Notes'), flex: 1, minWidth: 140 },
+    { field: 'created_by', headerName: tr('Par'), width: 130, valueGetter: (v) => v || '—' },
   ];
 
   return (
     <Box>
       <PageHeader
-        title="Traçabilité"
-        subtitle="Historique des mouvements et lots par produit"
+        title={tr('Traçabilité')}
+        subtitle={tr('Historique des mouvements et lots par produit')}
         action={
           <Button variant="contained" startIcon={<AddIcon />} onClick={openBatchDialog} disabled={!selected}>
-            Nouveau lot
+            {tr('Nouveau lot')}
           </Button>
         }
       />
@@ -148,7 +152,7 @@ export default function TraceabilityPage() {
         getOptionLabel={(p) => `${p.name} (${p.sku})`}
         value={selected}
         onChange={(_, v) => onSelectProduct(v)}
-        renderInput={(params) => <TextField {...params} label="Rechercher un produit" sx={{ mb: 2, maxWidth: 480 }} />}
+        renderInput={(params) => <TextField {...params} label={tr('Rechercher un produit')} sx={{ mb: 2, maxWidth: 480 }} />}
       />
 
       {error && !batchOpen && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -158,15 +162,15 @@ export default function TraceabilityPage() {
           <Box sx={{ px: 2, pt: 2 }}>
             <Typography variant="h6" fontWeight={600}>{trace.product.name}</Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 0.5, mb: 1 }}>
-              <Chip size="small" label={`SKU: ${trace.product.sku}`} variant="outlined" />
-              <Chip size="small" label={`Stock total: ${trace.product.total_stock}`} color="primary" variant="outlined" />
-              {trace.product.track_batches && <Chip size="small" label="Lots activés" color="info" variant="outlined" />}
+              <Chip size="small" label={`${tr('SKU')}: ${trace.product.sku}`} variant="outlined" />
+              <Chip size="small" label={`${tr('Stock total')}: ${formatNumber(trace.product.total_stock)}`} color="primary" variant="outlined" />
+              {trace.product.track_batches && <Chip size="small" label={tr('Lots activés')} color="info" variant="outlined" />}
             </Stack>
           </Box>
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2, borderBottom: 1, borderColor: 'divider' }}>
-            <Tab label={`Stock (${trace.stock_levels.length})`} />
-            <Tab label={`Lots (${batches.length})`} />
-            <Tab label={`Mouvements (${trace.movements.length})`} />
+            <Tab label={`${tr('Stock')} (${trace.stock_levels.length})`} />
+            <Tab label={`${tr('Lots')} (${batches.length})`} />
+            <Tab label={`${tr('Mouvements')} (${trace.movements.length})`} />
           </Tabs>
           <Box sx={{ height: 440, p: tab === 0 ? 0 : 0 }}>
             {tab === 0 && (
@@ -188,26 +192,26 @@ export default function TraceabilityPage() {
       )}
 
       {!selected && (
-        <Typography color="text.secondary">Sélectionnez un produit pour afficher sa traçabilité.</Typography>
+        <Typography color="text.secondary">{tr('Sélectionnez un produit pour afficher sa traçabilité.')}</Typography>
       )}
 
       <Dialog open={batchOpen} onClose={() => setBatchOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Nouveau lot{selected ? ` — ${selected.name}` : ''}</DialogTitle>
+        <DialogTitle>{tr('Nouveau lot')}{selected ? ` — ${selected.name}` : ''}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
-            <TextField label="Numéro de lot" value={batchForm.batch_number}
+            <TextField label={tr('Numéro de lot')} value={batchForm.batch_number}
               onChange={(e) => setBatchForm({ ...batchForm, batch_number: e.target.value })} fullWidth required />
-            <TextField label="Quantité" type="number" value={batchForm.quantity}
+            <TextField label={tr('Quantité')} type="number" value={batchForm.quantity}
               onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })} fullWidth required />
-            <TextField label="Date d'expiration" type="date" value={batchForm.expiry_date}
+            <TextField label={tr("Date d'expiration")} type="date" value={batchForm.expiry_date}
               onChange={(e) => setBatchForm({ ...batchForm, expiry_date: e.target.value })} fullWidth
               InputLabelProps={{ shrink: true }} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setBatchOpen(false)}>Annuler</Button>
-          <Button variant="contained" onClick={saveBatch} disabled={saving || !selected}>Enregistrer</Button>
+          <Button onClick={() => setBatchOpen(false)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={saveBatch} disabled={saving || !selected}>{tr('Enregistrer')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

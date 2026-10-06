@@ -95,7 +95,7 @@ export async function exportAnalyticsExcel(query: AnalyticsQuery) {
     Object.entries(buildParams(query)).map(([k, v]) => [k, String(v)]),
   ).toString();
   const url = `${API_BASE_URL}/reports/analytics/export/?${params}`;
-  const fileUri = `${FileSystem.cacheDirectory}inventra_rapport_${query.period || 'month'}.xlsx`;
+  const fileUri = `${FileSystem.cacheDirectory}stokeya_rapport_${query.period || 'month'}.xlsx`;
 
   const result = await FileSystem.downloadAsync(url, fileUri, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -108,7 +108,7 @@ export async function exportAnalyticsExcel(query: AnalyticsQuery) {
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(result.uri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Rapport Inventra',
+      dialogTitle: 'Rapport Stokeya',
       UTI: 'org.openxmlformats.spreadsheetml.sheet',
     });
   }

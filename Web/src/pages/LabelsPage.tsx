@@ -15,6 +15,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PageHeader from '../components/PageHeader';
 import { fetchProducts, type Product } from '../api/auth';
 import { formatCurrency } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 interface LabelItem {
   product: Product;
@@ -27,6 +28,9 @@ function barcodeText(product: Product): string {
 }
 
 export default function LabelsPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [selected, setSelected] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
@@ -65,11 +69,11 @@ export default function LabelsPage() {
   return (
     <Box>
       <PageHeader
-        title="Étiquettes"
-        subtitle="Impression d'étiquettes produits"
+        title={tr('Étiquettes')}
+        subtitle={tr("Impression d'étiquettes produits")}
         action={
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} disabled={labels.length === 0}>
-            Imprimer ({labels.length})
+            {tr('Imprimer')} ({labels.length})
           </Button>
         }
       />
@@ -82,12 +86,12 @@ export default function LabelsPage() {
               getOptionLabel={(p) => `${p.name} (${p.sku})`}
               value={selected}
               onChange={(_, v) => setSelected(v)}
-              renderInput={(params) => <TextField {...params} label="Produit" fullWidth />}
+              renderInput={(params) => <TextField {...params} label={tr('Produit')} fullWidth />}
               sx={{ flex: 1, minWidth: 240 }}
             />
-            <TextField label="Quantité" type="number" value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+            <TextField label={tr('Quantité')} type="number" value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
               sx={{ width: 120 }} inputProps={{ min: 1 }} />
-            <Button variant="outlined" onClick={addItem} disabled={!selected}>Ajouter</Button>
+            <Button variant="outlined" onClick={addItem} disabled={!selected}>{tr('Ajouter')}</Button>
           </Stack>
 
           {items.length > 0 && (
@@ -95,7 +99,7 @@ export default function LabelsPage() {
               {items.map((item) => (
                 <Stack key={item.product.id} direction="row" alignItems="center" justifyContent="space-between"
                   sx={{ py: 0.5, borderBottom: '1px solid #EEF1F5' }}>
-                  <Typography variant="body2">{item.product.name} — {item.quantity} étiquette(s)</Typography>
+                  <Typography variant="body2">{item.product.name} — {item.quantity} {tr('étiquette(s)')}</Typography>
                   <IconButton size="small" onClick={() => removeItem(item.product.id)}>
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
@@ -109,7 +113,7 @@ export default function LabelsPage() {
       <Box className="labels-print-area" sx={{ '@media print': { p: 0 } }}>
         {labels.length === 0 ? (
           <Typography color="text.secondary" sx={{ '@media print': { display: 'none' } }}>
-            Ajoutez des produits pour générer des étiquettes.
+            {tr('Ajoutez des produits pour générer des étiquettes.')}
           </Typography>
         ) : (
           <Box sx={{
@@ -142,7 +146,7 @@ export default function LabelsPage() {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: 13, lineHeight: 1.2, mb: 0.5 }}>
                   {label.product.name}
                 </Typography>
-                <Typography variant="caption" display="block">SKU: {label.product.sku}</Typography>
+                <Typography variant="caption" display="block">{tr('SKU')}: {label.product.sku}</Typography>
                 <Typography variant="caption" display="block" sx={{ fontWeight: 600 }}>
                   {formatCurrency(label.product.sale_price)}
                 </Typography>

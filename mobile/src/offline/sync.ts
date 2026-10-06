@@ -1,5 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import { syncOfflineSales } from '../api/sales';
+import { unitPriceForQty } from '../utils/pricing';
 import {
   getOfflineQueue,
   markOfflineSaleError,
@@ -76,10 +77,19 @@ export function buildOfflineSaleFromCart(params: {
   warehouseId?: number | null;
   customerId?: number | null;
   cashRegisterId?: number | null;
-  cart: Array<{ product: { id: number; name: string; sale_price: string }; quantity: number }>;
+  cart: Array<{
+    product: {
+      id: number;
+      name: string;
+      sale_price: string;
+      wholesale_price?: string | null;
+      wholesale_min_qty?: string | number | null;
+    };
+    quantity: number;
+  }>;
 }): OfflineSalePayload {
   const localTotal = params.cart.reduce(
-    (sum, l) => sum + l.quantity * Number(l.product.sale_price),
+    (sum, l) => sum + l.quantity * unitPriceForQty(l.product, l.quantity),
     0,
   );
   const label = params.cart.map((l) => `${l.product.name} x${l.quantity}`).join(', ');
@@ -93,7 +103,7 @@ export function buildOfflineSaleFromCart(params: {
     items: params.cart.map((l) => ({
       product_id: l.product.id,
       quantity: String(l.quantity),
-      unit_price: l.product.sale_price,
+      unit_price: String(unitPriceForQty(l.product, l.quantity)),
     })),
     is_offline: true,
     created_at_local: new Date().toISOString(),

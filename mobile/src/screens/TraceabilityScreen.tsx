@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Searchbar, Text } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { fetchProducts, type Product } from '../api/auth';
 import { fetchProductTraceability, type ProductTraceability } from '../api/products';
@@ -40,10 +41,10 @@ export default function TraceabilityScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Traçabilité" subtitle="Niveaux, lots et mouvements" />
-      </Appbar.Header>
+      </AppHeader>
 
       <Searchbar placeholder="Rechercher un produit..." value={search} onChangeText={setSearch} style={styles.search} />
 

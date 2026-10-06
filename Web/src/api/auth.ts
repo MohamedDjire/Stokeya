@@ -1,4 +1,4 @@
-import { api, clearTokens, saveTokens } from './client';
+import { api, clearTokens, fetchAllPages, saveTokens } from './client';
 
 export interface User {
   id: number;
@@ -8,10 +8,30 @@ export interface User {
   first_name: string;
   last_name: string;
   full_name: string;
+  avatar?: string | null;
   company: number;
+  company_name?: string | null;
+  company_logo?: string | null;
   is_company_admin: boolean;
   is_active: boolean;
   permissions?: string[];
+  role_code?: string | null;
+  flags?: Record<string, boolean>;
+  scope?: {
+    role_code?: string | null;
+    branch_id?: number | null;
+    warehouse_id?: number | null;
+    cash_register_id?: number | null;
+    is_cashier?: boolean;
+    is_pos_manager?: boolean;
+    is_warehouse_staff?: boolean;
+    flags?: Record<string, boolean>;
+  };
+  assigned_branch?: number | null;
+  assigned_branch_name?: string | null;
+  assigned_warehouse?: number | null;
+  assigned_cash_register?: number | null;
+  assigned_cash_register_name?: string | null;
 }
 
 export interface DashboardAlertItem {
@@ -69,6 +89,7 @@ export interface DashboardData {
     to_restock: DashboardAlertItem[];
     negative: DashboardAlertItem[];
     low_stock: DashboardAlertItem[];
+    out_of_stock?: DashboardAlertItem[];
   };
   charts?: {
     labels: string[];
@@ -78,6 +99,18 @@ export interface DashboardData {
     sales: number[];
     margin: number[];
   };
+  sites_overview?: Array<{
+    warehouse_id: number;
+    warehouse_name: string;
+    branch_id: number;
+    branch_name: string;
+    is_pos_stock: boolean;
+    is_main: boolean;
+    kind: 'main' | 'warehouse' | 'pos' | string;
+    stock_qty: number;
+    stock_value: number;
+    pending_requests: number;
+  }>;
 }
 
 export interface OptionItem {
@@ -98,10 +131,15 @@ export interface Product {
   unit_name: string;
   purchase_price: string;
   sale_price: string;
+  wholesale_price?: string | null;
+  wholesale_min_qty?: string | number | null;
+  wholesale_discount_type?: 'price' | 'percent' | 'amount';
+  wholesale_discount_value?: string | null;
   tax_rate: string;
   min_stock: string;
   max_stock: string | null;
   total_stock: string;
+  stock_status?: 'ok' | 'low' | 'out_of_stock';
   image: string | null;
   track_batches: boolean;
   is_active: boolean;
@@ -122,6 +160,13 @@ export async function register(payload: {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  whatsapp?: string;
+  shop_slug?: string;
+  wave_number?: string;
+  orange_money_number?: string;
+  payment_timing?: string;
 }) {
   const { data } = await api.post('/auth/register/', payload);
   if (data.access && data.refresh) saveTokens(data.access, data.refresh);
@@ -139,6 +184,15 @@ export async function updateProfile(payload: {
   phone?: string;
 }): Promise<User> {
   const { data } = await api.patch('/auth/me/', payload);
+  return data;
+}
+
+export async function uploadAvatar(file: File): Promise<User> {
+  const form = new FormData();
+  form.append('avatar', file);
+  const { data } = await api.post('/auth/me/avatar/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return data;
 }
 
@@ -173,23 +227,19 @@ export async function confirmPasswordReset(payload: {
 }
 
 export async function fetchProducts(search?: string): Promise<Product[]> {
-  const { data } = await api.get('/products/', { params: search ? { search } : undefined });
-  return data.results;
+  return fetchAllPages<Product>('/products/', search ? { search } : undefined);
 }
 
 export async function fetchUnits(): Promise<OptionItem[]> {
-  const { data } = await api.get('/units/');
-  return data.results;
+  return fetchAllPages<OptionItem>('/units/');
 }
 
 export async function fetchCategories(): Promise<OptionItem[]> {
-  const { data } = await api.get('/categories/');
-  return data.results;
+  return fetchAllPages<OptionItem>('/categories/');
 }
 
 export async function fetchBrands(): Promise<OptionItem[]> {
-  const { data } = await api.get('/brands/');
-  return data.results;
+  return fetchAllPages<OptionItem>('/brands/');
 }
 
 export async function createProduct(payload: Record<string, unknown>) {
@@ -218,7 +268,84 @@ export async function uploadProductImage(id: number, file: File) {
 export interface ImportResult {
   created: number;
   skipped: number;
+  updated?: number;
   errors: string[];
+  batch_id?: number;
+}
+
+export type DuplicatePolicy = 'ignore' | 'update' | 'ask';
+
+export interface ImportTargetField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface ImportRow {
+  line: number;
+  name: string;
+  sale_price: string;
+  purchase_price: string;
+  sku: string;
+  barcode: string;
+  quantity: string;
+  category: string;
+  brand: string;
+  unit: string;
+  tax_rate: string;
+  description: string;
+  issues: string[];
+}
+
+export interface ImportAnalyzeResult {
+  batch_id: number;
+  filename: string;
+  total_rows: number;
+  headers: string[];
+  suggested_mapping: Record<string, number>;
+  unmapped_columns: { index: number; header: string }[];
+  target_fields: ImportTargetField[];
+  missing_required: string[];
+  rows: ImportRow[];
+  incomplete_count: number;
+  preview?: ImportRow[];
+}
+
+export interface ImportPrepareResult {
+  batch_id: number;
+  headers: string[];
+  column_mapping: Record<string, number>;
+  unmapped_columns: { index: number; header: string }[];
+  missing_required: string[];
+  target_fields: ImportTargetField[];
+  total_rows: number;
+  rows: ImportRow[];
+  incomplete_count: number;
+}
+
+export interface ImportExecuteResult {
+  batch_id: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  total_rows: number;
+  errors: Array<{ line: number; name: string; message: string }>;
+  can_undo_until: string | null;
+}
+
+export interface ImportHistoryItem {
+  id: number;
+  filename: string;
+  status: string;
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  errors_count: number;
+  created_at: string;
+  can_undo_until: string | null;
+  can_undo: boolean;
+  created_by: string | null;
 }
 
 export async function importProducts(file: File): Promise<ImportResult> {
@@ -227,6 +354,43 @@ export async function importProducts(file: File): Promise<ImportResult> {
   const { data } = await api.post('/products/import/', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return data;
+}
+
+export async function analyzeProductImport(file: File): Promise<ImportAnalyzeResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post('/products/import-analyze/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function prepareProductImport(
+  batchId: number,
+  column_mapping: Record<string, number>,
+): Promise<ImportPrepareResult> {
+  const { data } = await api.post(`/products/import-batches/${batchId}/prepare/`, {
+    column_mapping,
+  });
+  return data;
+}
+
+export async function executeProductImport(
+  batchId: number,
+  payload: { rows: ImportRow[] },
+): Promise<ImportExecuteResult> {
+  const { data } = await api.post(`/products/import-batches/${batchId}/execute/`, payload);
+  return data;
+}
+
+export async function undoProductImport(batchId: number): Promise<{ deleted: number; batch_id: number }> {
+  const { data } = await api.post(`/products/import-batches/${batchId}/undo/`);
+  return data;
+}
+
+export async function fetchImportHistory(): Promise<ImportHistoryItem[]> {
+  const { data } = await api.get('/products/import-history/');
   return data;
 }
 

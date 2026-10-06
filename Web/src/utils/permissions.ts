@@ -25,6 +25,14 @@ export const MODULE_PERMISSION_MAP: Record<string, string> = {
   cash: 'GCS',
 };
 
+export type UserLike = {
+  is_company_admin?: boolean;
+  permissions?: string[];
+  flags?: Record<string, boolean>;
+  scope?: { flags?: Record<string, boolean>; is_cashier?: boolean };
+  role_code?: string | null;
+};
+
 export function hasPermission(
   permissions: string[] | undefined,
   code: string | string[],
@@ -42,4 +50,34 @@ export function hasModuleAccess(
   const code = MODULE_PERMISSION_MAP[moduleName];
   if (!code) return true;
   return hasPermission(permissions, code);
+}
+
+export function hasFlag(user: UserLike | null | undefined, flag: string): boolean {
+  if (!user) return false;
+  if (user.is_company_admin) return true;
+  const flags = user.flags || user.scope?.flags || {};
+  return Boolean(flags[flag]);
+}
+
+/** Navigation : modules + flags métier (caissier = ventes seulement). */
+export function canAccessNavItem(
+  user: UserLike | null | undefined,
+  opts: {
+    module?: string;
+    adminOnly?: boolean;
+    flag?: string;
+    /** Masquer pour les caissiers même s'ils ont GS (ex. stock magasin en lecture) */
+    hideForCashier?: boolean;
+  },
+): boolean {
+  if (!user) return false;
+  if (opts.adminOnly && !user.is_company_admin && !hasFlag(user, 'can_create_user')) {
+    return false;
+  }
+  if (opts.hideForCashier && (user.role_code === 'cashier' || user.scope?.is_cashier)) {
+    return false;
+  }
+  if (opts.flag && !hasFlag(user, opts.flag)) return false;
+  if (opts.module && !hasModuleAccess(user.permissions, opts.module)) return false;
+  return true;
 }

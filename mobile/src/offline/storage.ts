@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const QUEUE_KEY = 'inventra_offline_sales_queue';
-const CATALOG_KEY = 'inventra_offline_catalog';
-const CONTEXT_KEY = 'inventra_offline_pos_context';
+const QUEUE_KEY = 'stokeya_offline_sales_queue';
+const CATALOG_KEY = 'stokeya_offline_catalog';
+const CONTEXT_KEY = 'stokeya_offline_pos_context';
 
 export type OfflineSalePayload = {
   client_reference: string;
@@ -27,6 +27,7 @@ export type OfflineCatalogProduct = {
   name: string;
   sku: string;
   sale_price: string;
+  image?: string | null;
   barcodes?: Array<{ code: string; is_primary: boolean }>;
   total_stock?: string;
 };

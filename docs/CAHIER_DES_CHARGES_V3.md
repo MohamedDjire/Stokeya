@@ -1,7 +1,7 @@
-# Inventra — Cahier des charges V3 (Mise en ligne fin de semaine)
+# Stokeya — Cahier des charges V3 (Mise en ligne fin de semaine)
 
 ## Objectif immédiat
-Mettre **Inventra** en production d'ici la fin de la semaine avec :
+Mettre **Stokeya** en production d'ici la fin de la semaine avec :
 - Backend Django + PostgreSQL
 - App mobile Android (Expo)
 - Paiements **Wave** (priorité)
@@ -38,8 +38,8 @@ Mettre **Inventra** en production d'ici la fin de la semaine avec :
 ```
 WAVE_API_KEY=wave_sn_prod_xxx
 WAVE_WEBHOOK_SECRET=whsec_xxx
-WAVE_SUCCESS_URL=https://api.inventra.sn/payments/wave/success/
-WAVE_ERROR_URL=https://api.inventra.sn/payments/wave/error/
+WAVE_SUCCESS_URL=https://api.stokeya.com/payments/wave/success/
+WAVE_ERROR_URL=https://api.stokeya.com/payments/wave/error/
 ```
 
 ### Sécurité

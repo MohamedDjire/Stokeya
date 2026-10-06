@@ -35,11 +35,13 @@ PROVIDER_LABELS = {
     PaymentProvider.WAVE: 'Wave',
     PaymentProvider.ORANGE_MONEY: 'Orange Money',
     PaymentProvider.MTN_MONEY: 'MTN Money',
+    PaymentProvider.PAYPAL: 'PayPal',
+    PaymentProvider.SASPAY: 'SasPay',
 }
 
 
 def available_providers():
-    """Liste les providers configurés (ou tous en DEBUG)."""
+    """Liste les providers actifs (Wave + Orange Money uniquement pour l'instant)."""
     providers = []
     if settings.WAVE_API_KEY or settings.DEBUG:
         providers.append({
@@ -52,12 +54,6 @@ def available_providers():
             'code': PaymentProvider.ORANGE_MONEY,
             'label': 'Orange Money',
             'configured': bool(getattr(settings, 'ORANGE_MONEY_CLIENT_ID', '')),
-        })
-    if getattr(settings, 'MTN_MOMO_API_KEY', '') or settings.DEBUG:
-        providers.append({
-            'code': PaymentProvider.MTN_MONEY,
-            'label': 'MTN Money',
-            'configured': bool(getattr(settings, 'MTN_MOMO_API_KEY', '')),
         })
     return providers
 
@@ -221,7 +217,7 @@ def _create_mtn_session(amount, client_reference, phone=None):
             'partyIdType': 'MSISDN',
             'partyId': phone or getattr(settings, 'MTN_MOMO_DEFAULT_PAYER', '22997000000'),
         },
-        'payerMessage': 'Paiement Inventra',
+        'payerMessage': 'Paiement Stokeya',
         'payeeNote': client_reference,
     }
     response = requests.post(
@@ -241,13 +237,201 @@ def _create_mtn_session(amount, client_reference, phone=None):
         raise PaymentError('Impossible de créer la session MTN Money.')
 
     # MTN RequestToPay n'a pas toujours d'URL de redirection ; on renvoie
-    # une page Inventra d'attente + instructions USSD.
+    # une page Stokeya d'attente + instructions USSD.
     wait_url = f'{_success_url().rsplit("/payment/", 1)[0]}/payment/success?pending=1&provider=mtn_money&ref={client_reference}'
     return {
         'id': reference_id,
         'payment_url': wait_url,
         'status_code': response.status_code,
     }
+
+
+# ─── PayPal ──────────────────────────────────────────────────────────────────
+
+def _paypal_api_base():
+    mode = getattr(settings, 'PAYPAL_MODE', 'sandbox')
+    if mode == 'live':
+        return 'https://api-m.paypal.com'
+    return 'https://api-m.sandbox.paypal.com'
+
+
+def _paypal_access_token():
+    import base64
+
+    client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
+    client_secret = getattr(settings, 'PAYPAL_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
+        return None
+
+    auth = base64.b64encode(f'{client_id}:{client_secret}'.encode()).decode()
+    response = requests.post(
+        f'{_paypal_api_base()}/v1/oauth2/token',
+        headers={
+            'Authorization': f'Basic {auth}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        data={'grant_type': 'client_credentials'},
+        timeout=30,
+    )
+    if response.status_code >= 400:
+        logger.error('PayPal token error: %s', response.text)
+        raise PaymentError('Authentification PayPal impossible.')
+    return response.json().get('access_token')
+
+
+def _paypal_amount_from_xof(amount_xof):
+    """Convertit un montant XOF en devise PayPal (EUR/USD)."""
+    currency = getattr(settings, 'PAYPAL_CURRENCY', 'EUR')
+    rate = Decimal(str(getattr(settings, 'PAYPAL_XOF_RATE', 655.957)))
+    if rate <= 0:
+        rate = Decimal('655.957')
+    converted = (Decimal(amount_xof) / rate).quantize(Decimal('0.01'))
+    if converted <= 0:
+        converted = Decimal('0.01')
+    return f'{converted:.2f}', currency
+
+
+def _create_paypal_session(amount, client_reference):
+    client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
+    client_secret = getattr(settings, 'PAYPAL_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
+        raise PaymentError(
+            'PayPal n’est pas configuré. Renseignez PAYPAL_CLIENT_ID et PAYPAL_CLIENT_SECRET.'
+        )
+
+    token = _paypal_access_token()
+    if not token:
+        raise PaymentError('PayPal : identifiants invalides.')
+
+    value, currency = _paypal_amount_from_xof(amount)
+    return_url = getattr(settings, 'PAYPAL_RETURN_URL', _success_url())
+    if 'provider=' not in return_url:
+        sep = '&' if '?' in return_url else '?'
+        return_url = f'{return_url}{sep}provider=paypal'
+    cancel_url = getattr(settings, 'PAYPAL_CANCEL_URL', _error_url())
+
+    payload = {
+        'intent': 'CAPTURE',
+        'purchase_units': [{
+            'reference_id': client_reference[:127],
+            'amount': {
+                'currency_code': currency,
+                'value': value,
+            },
+            'description': f'Stokeya — {client_reference}'[:127],
+        }],
+        'application_context': {
+            'return_url': return_url,
+            'cancel_url': cancel_url,
+            'brand_name': 'Stokeya',
+            'user_action': 'PAY_NOW',
+            'shipping_preference': 'NO_SHIPPING',
+        },
+    }
+    response = requests.post(
+        f'{_paypal_api_base()}/v2/checkout/orders',
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        },
+        json=payload,
+        timeout=30,
+    )
+    if response.status_code >= 400:
+        logger.error('PayPal order error: %s', response.text)
+        raise PaymentError('Impossible de créer la commande PayPal.')
+
+    data = response.json()
+    order_id = data.get('id', '')
+    approve_url = ''
+    for link in data.get('links', []):
+        if link.get('rel') == 'approve':
+            approve_url = link.get('href', '')
+            break
+    return {
+        'id': order_id,
+        'payment_url': approve_url,
+        'paypal_amount': value,
+        'paypal_currency': currency,
+        **data,
+    }
+
+
+def capture_paypal_order(order_id: str):
+    """Capture une commande PayPal après approbation (retour utilisateur ou webhook)."""
+    if not order_id:
+        raise PaymentError('Identifiant PayPal manquant.')
+
+    if order_id.startswith('mock-paypal-') and settings.DEBUG:
+        checkout = (
+            WaveCheckout.objects.filter(session_id=order_id, provider=PaymentProvider.PAYPAL).first()
+            or SubscriptionWaveCheckout.objects.filter(
+                session_id=order_id, provider=PaymentProvider.PAYPAL,
+            ).first()
+        )
+        if checkout:
+            mark_checkout_completed(checkout.client_reference, provider=PaymentProvider.PAYPAL)
+        return {'status': 'COMPLETED', 'mock': True}
+
+    token = _paypal_access_token()
+    if not token:
+        raise PaymentError('PayPal : identifiants invalides.')
+
+    response = requests.post(
+        f'{_paypal_api_base()}/v2/checkout/orders/{order_id}/capture',
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        },
+        json={},
+        timeout=30,
+    )
+    data = {}
+    try:
+        data = response.json()
+    except Exception:
+        data = {}
+
+    if response.status_code >= 400:
+        issues = {d.get('issue') for d in (data.get('details') or []) if isinstance(d, dict)}
+        if 'ORDER_ALREADY_CAPTURED' in issues or response.status_code == 422:
+            status_resp = requests.get(
+                f'{_paypal_api_base()}/v2/checkout/orders/{order_id}',
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=30,
+            )
+            data = status_resp.json() if status_resp.status_code < 400 else data
+        else:
+            logger.error('PayPal capture error: %s', response.text)
+            raise PaymentError('Capture PayPal impossible.')
+    status = data.get('status', '')
+    if status != 'COMPLETED':
+        for unit in data.get('purchase_units') or []:
+            captures = ((unit.get('payments') or {}).get('captures')) or []
+            if any(c.get('status') == 'COMPLETED' for c in captures):
+                status = 'COMPLETED'
+                break
+
+    client_reference = None
+    for unit in data.get('purchase_units') or []:
+        client_reference = unit.get('reference_id')
+        if client_reference:
+            break
+
+    if status == 'COMPLETED':
+        if client_reference:
+            mark_checkout_completed(client_reference, provider=PaymentProvider.PAYPAL)
+        else:
+            checkout = (
+                WaveCheckout.objects.filter(session_id=order_id, provider=PaymentProvider.PAYPAL).first()
+                or SubscriptionWaveCheckout.objects.filter(
+                    session_id=order_id, provider=PaymentProvider.PAYPAL,
+                ).first()
+            )
+            if checkout:
+                mark_checkout_completed(checkout.client_reference, provider=PaymentProvider.PAYPAL)
+
+    return data
 
 
 def _create_provider_session(provider, amount, client_reference, phone=None):
@@ -259,6 +443,9 @@ def _create_provider_session(provider, amount, client_reference, phone=None):
         return data.get('id', ''), data.get('payment_url', ''), data
     if provider == PaymentProvider.MTN_MONEY:
         data = _create_mtn_session(amount, client_reference, phone=phone)
+        return data.get('id', ''), data.get('payment_url', ''), data
+    if provider == PaymentProvider.PAYPAL:
+        data = _create_paypal_session(amount, client_reference)
         return data.get('id', ''), data.get('payment_url', ''), data
     raise PaymentError(f'Fournisseur de paiement inconnu : {provider}')
 
@@ -283,7 +470,7 @@ def create_checkout_session(sale, provider=PaymentProvider.WAVE, phone=None):
         raw_response=raw,
     )
 
-    payment = sale.payments.filter(method='mobile_money').first()
+    payment = sale.payments.filter(method__in=['mobile_money', 'card']).first()
     if payment:
         payment.reference = checkout.session_id
         payment.status = 'pending'
@@ -294,12 +481,25 @@ def create_checkout_session(sale, provider=PaymentProvider.WAVE, phone=None):
     return checkout
 
 
-def create_subscription_checkout(company, plan, billing_cycle='monthly', provider=PaymentProvider.WAVE, phone=None):
-    amount = Decimal(plan.price_annual if billing_cycle == 'annual' else plan.price)
+def create_subscription_checkout(
+    company, plan, billing_cycle='monthly', provider=PaymentProvider.WAVE,
+    phone=None, months=1,
+):
+    from companies.subscription_service import price_for_months
+
+    months = int(months or 1)
+    if months not in (1, 3, 6, 12):
+        months = 12 if billing_cycle == 'annual' else 1
+
+    amount = price_for_months(plan, months)
     if amount <= 0:
         raise PaymentError('Montant invalide.')
 
-    client_reference = f'SUB-{company.id}-{plan.code}-{billing_cycle}-{timezone.now().strftime("%Y%m%d%H%M%S")}'
+    cycle = 'annual' if months >= 12 else 'monthly'
+    client_reference = (
+        f'SUB-{company.id}-{plan.code}-{months}m-'
+        f'{timezone.now().strftime("%Y%m%d%H%M%S")}'
+    )
     session_id, launch_url, raw = _create_provider_session(
         provider, amount, client_reference, phone=phone,
     )
@@ -307,7 +507,8 @@ def create_subscription_checkout(company, plan, billing_cycle='monthly', provide
     return SubscriptionWaveCheckout.objects.create(
         company=company,
         plan=plan,
-        billing_cycle=billing_cycle,
+        billing_cycle=cycle,
+        months=months,
         provider=provider,
         session_id=session_id or f'{provider}-{uuid.uuid4().hex[:16]}',
         client_reference=client_reference,
@@ -382,19 +583,12 @@ def verify_webhook_signature(body: bytes, signature_header: str) -> bool:
 
 
 def _activate_subscription(checkout: SubscriptionWaveCheckout):
-    from datetime import timedelta
-    from companies.models import BillingCycle, Subscription, SubscriptionStatus
+    from companies.models import Subscription
+    from companies.subscription_service import apply_plan_period
 
     subscription = Subscription.objects.select_related('plan').get(company=checkout.company)
-    subscription.plan = checkout.plan
-    subscription.billing_cycle = (
-        BillingCycle.ANNUAL if checkout.billing_cycle == 'annual' else BillingCycle.MONTHLY
-    )
-    subscription.status = SubscriptionStatus.ACTIVE
-    subscription.start_date = timezone.now().date()
-    duration = 365 if checkout.billing_cycle == 'annual' else 30
-    subscription.end_date = timezone.now().date() + timedelta(days=duration)
-    subscription.save()
+    months = getattr(checkout, 'months', None) or (12 if checkout.billing_cycle == 'annual' else 1)
+    apply_plan_period(subscription, checkout.plan, checkout.billing_cycle, months=months)
 
 
 def _complete_sale_checkout(checkout: WaveCheckout):
@@ -403,7 +597,7 @@ def _complete_sale_checkout(checkout: WaveCheckout):
     sale = checkout.sale
     sale.payment_status = PaymentStatus.PAID
     sale.save(update_fields=['payment_status', 'updated_at'])
-    for payment in sale.payments.filter(method='mobile_money'):
+    for payment in sale.payments.filter(method__in=['mobile_money', 'card']):
         payment.status = 'completed'
         payment.save(update_fields=['status', 'updated_at'])
 
@@ -415,7 +609,7 @@ def mark_checkout_completed(client_reference: str, provider=None):
         qs = SubscriptionWaveCheckout.objects.filter(client_reference=client_reference)
         if provider:
             qs = qs.filter(provider=provider)
-        sub_checkout = qs.order_by('-created_at').first()
+        sub_checkout = qs.select_for_update().order_by('-created_at').first()
         if not sub_checkout:
             return False
         if sub_checkout.status != CheckoutStatus.COMPLETED:
@@ -427,7 +621,7 @@ def mark_checkout_completed(client_reference: str, provider=None):
     qs = WaveCheckout.objects.select_related('sale').filter(client_reference=client_reference)
     if provider:
         qs = qs.filter(provider=provider)
-    checkout = qs.order_by('-created_at').first()
+    checkout = qs.select_for_update().order_by('-created_at').first()
     if not checkout:
         return False
     if checkout.status != CheckoutStatus.COMPLETED:
@@ -478,3 +672,33 @@ def process_webhook_event(event_id: str, event_type: str, payload: dict, provide
         client_reference = payload.get('externalId') or payload.get('client_reference')
         if client_reference:
             mark_checkout_completed(client_reference, provider=PaymentProvider.MTN_MONEY)
+        return
+
+    # PayPal — PAYMENT.CAPTURE.COMPLETED ou CHECKOUT.ORDER.APPROVED
+    if provider == PaymentProvider.PAYPAL:
+        event_type = event_type or payload.get('event_type', '')
+        resource = payload.get('resource') or {}
+        if event_type == 'PAYMENT.CAPTURE.COMPLETED':
+            client_reference = resource.get('custom_id') or resource.get('invoice_id')
+            order_id = resource.get('supplementary_data', {}).get('related_ids', {}).get('order_id')
+            if not client_reference and order_id:
+                checkout = (
+                    WaveCheckout.objects.filter(session_id=order_id).first()
+                    or SubscriptionWaveCheckout.objects.filter(session_id=order_id).first()
+                )
+                if checkout:
+                    client_reference = checkout.client_reference
+            if client_reference:
+                mark_checkout_completed(client_reference, provider=PaymentProvider.PAYPAL)
+            elif order_id:
+                try:
+                    capture_paypal_order(order_id)
+                except PaymentError:
+                    logger.exception('PayPal webhook capture failed for %s', order_id)
+        elif event_type == 'CHECKOUT.ORDER.APPROVED':
+            order_id = resource.get('id')
+            if order_id:
+                try:
+                    capture_paypal_order(order_id)
+                except PaymentError:
+                    logger.exception('PayPal auto-capture failed for %s', order_id)

@@ -11,6 +11,7 @@ class SubscriptionPlan(TimeStampedModel):
     price_annual = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     max_users = models.PositiveIntegerField(default=5)
     max_branches = models.PositiveIntegerField(default=1)
+    max_warehouses = models.PositiveIntegerField(default=0)
     max_products = models.PositiveIntegerField(default=500)
     features = models.JSONField(default=list, blank=True)
     is_public = models.BooleanField(default=True)
@@ -34,13 +35,18 @@ class Company(TimeStampedModel):
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
     logo = models.ImageField(upload_to='companies/logos/', blank=True, null=True)
+    slogan = models.CharField(max_length=255, blank=True)
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
+    website = models.URLField(blank=True)
+    tax_id = models.CharField(max_length=100, blank=True, verbose_name='Identifiant fiscal')
     country = models.CharField(max_length=100, default='SN')
     currency = models.CharField(max_length=3, default='XOF')
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=18.00)
     is_active = models.BooleanField(default=True)
+    # Préférences de fonctionnement global (commercial, affichage, notifs, …)
+    preferences = models.JSONField(default=dict, blank=True)
 
     class Meta:
         verbose_name_plural = 'companies'
@@ -48,6 +54,10 @@ class Company(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def get_preferences(self):
+        from .preferences import get_company_preferences
+        return get_company_preferences(self)
 
 
 class SubscriptionStatus(models.TextChoices):
@@ -60,6 +70,12 @@ class SubscriptionStatus(models.TextChoices):
 class BillingCycle(models.TextChoices):
     MONTHLY = 'monthly', 'Mensuel'
     ANNUAL = 'annual', 'Annuel'
+
+
+class PreferredPaymentMethod(models.TextChoices):
+    WAVE = 'wave', 'Wave'
+    ORANGE_MONEY = 'orange_money', 'Orange Money'
+    NONE = '', 'Non défini'
 
 
 class Subscription(TimeStampedModel):
@@ -77,6 +93,13 @@ class Subscription(TimeStampedModel):
     )
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
+    auto_renew = models.BooleanField(default=False)
+    preferred_payment_method = models.CharField(
+        max_length=20,
+        choices=PreferredPaymentMethod.choices,
+        blank=True,
+        default='',
+    )
 
     def __str__(self):
         return f'{self.company.name} — {self.plan.name}'

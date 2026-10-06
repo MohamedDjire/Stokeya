@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useLocale } from '../locale/useLocale';
 
 type Props = {
   open: boolean;
@@ -16,9 +17,11 @@ type Props = {
   onScan: (code: string) => void;
 };
 
-const SCANNER_ID = 'inventra-webcam-scanner';
+const SCANNER_ID = 'stokeya-webcam-scanner';
 
 export default function WebcamBarcodeScanner({ open, onClose, onScan }: Props) {
+  const { tr, version } = useLocale();
+  void version;
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const handledRef = useRef(false);
   const onScanRef = useRef(onScan);
@@ -67,10 +70,10 @@ export default function WebcamBarcodeScanner({ open, onClose, onScan }: Props) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Scanner avec la caméra</DialogTitle>
+      <DialogTitle>{tr('Scanner avec la caméra')}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Présentez le code-barres devant la webcam. Autorisez l’accès caméra si demandé.
+          {tr('Présentez le code-barres devant la webcam. Autorisez l’accès caméra si demandé.')}
         </Typography>
         <Box
           id={SCANNER_ID}
@@ -85,7 +88,7 @@ export default function WebcamBarcodeScanner({ open, onClose, onScan }: Props) {
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Fermer</Button>
+        <Button onClick={onClose}>{tr('Fermer')}</Button>
       </DialogActions>
     </Dialog>
   );

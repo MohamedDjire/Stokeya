@@ -1,4 +1,4 @@
-# Inventra — Roadmap Sprint par Sprint
+# Stokeya — Roadmap Sprint par Sprint
 
 ## Vue d'ensemble
 
@@ -76,7 +76,7 @@
 - [ ] Tests E2E parcours vente
 - [ ] Déploiement staging + pilote 2 commerces
 
-**DoD** : 2 commerces pilotes utilisent Inventra en production staging.
+**DoD** : 2 commerces pilotes utilisent Stokeya en production staging.
 
 ---
 

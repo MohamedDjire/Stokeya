@@ -31,4 +31,5 @@ export type AppStackParamList = {
   Labels: undefined;
   Traceability: undefined;
   StockRequests: undefined;
+  ShopOrders: undefined;
 };

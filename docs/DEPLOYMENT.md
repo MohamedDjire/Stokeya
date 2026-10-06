@@ -1,8 +1,8 @@
-# Déploiement Inventra — Mise en ligne fin de semaine
+# Déploiement Stokeya — Mise en ligne fin de semaine
 
 ## Prérequis serveur
 - VPS Ubuntu 22+ (2 Go RAM minimum)
-- Domaine : `api.inventra.sn` (ou votre domaine)
+- Domaine : `api.stokeya.com` (ou votre domaine)
 - Compte Wave Business avec API Key activée
 
 ## 1. Préparer le serveur
@@ -37,7 +37,7 @@ Installer Nginx + Certbot, proxy vers port 8000 :
 ```nginx
 server {
     listen 443 ssl;
-    server_name api.inventra.sn;
+    server_name api.stokeya.com;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -47,7 +47,7 @@ server {
     }
 
     location /media/ {
-        alias /var/lib/docker/volumes/inventra_media_data/_data/;
+        alias /var/lib/docker/volumes/stokeya_media_data/_data/;
     }
 }
 ```
@@ -57,7 +57,7 @@ server {
 1. Aller sur [business.wave.com](https://business.wave.com) → Developer
 2. Copier **API Key** → `WAVE_API_KEY` dans `.env`
 3. Copier **Webhook Secret** → `WAVE_WEBHOOK_SECRET`
-4. Configurer webhook URL : `https://api.inventra.sn/api/v1/payments/wave/webhook/`
+4. Configurer webhook URL : `https://api.stokeya.com/api/v1/payments/wave/webhook/`
 5. `WAVE_SUCCESS_URL` et `WAVE_ERROR_URL` : pages de confirmation
 
 ## 6. Build APK mobile

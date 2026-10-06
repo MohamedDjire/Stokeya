@@ -65,7 +65,7 @@ export async function downloadAnalyticsExcel(query: AnalyticsQuery = {}) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `inventra_rapport_${query.period || 'month'}.xlsx`;
+  a.download = `stokeya_rapport_${query.period || 'month'}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();

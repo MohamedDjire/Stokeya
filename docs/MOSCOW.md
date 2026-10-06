@@ -1,4 +1,4 @@
-# Inventra — Priorisation MoSCoW
+# Stokeya — Priorisation MoSCoW
 
 ## Must Have (MVP — Phase 1)
 Fonctionnalités indispensables pour lancer un pilote commercial.

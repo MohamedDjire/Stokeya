@@ -1,3 +1,7 @@
+from decimal import Decimal
+from html import escape
+
+from django.db import OperationalError
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -10,33 +14,56 @@ from .serializers import SaleCreateSerializer, SaleSerializer
 from . import services
 
 
+def _fmt_qty(value):
+    qty = Decimal(str(value)).normalize()
+    if qty == qty.to_integral_value():
+        return str(int(qty))
+    return format(qty, 'f')
+
+
+def _fmt_money(value):
+    return f'{int(round(float(value))):,}'.replace(',', ' ')
+
+
 def _build_receipt_html(sale):
     company = sale.company
     lines = ''.join(
-        f'<tr><td>{item.product.name}</td>'
-        f'<td style="text-align:right">{item.quantity}</td>'
-        f'<td style="text-align:right">{item.unit_price:,.0f}</td>'
-        f'<td style="text-align:right">{item.total:,.0f}</td></tr>'
-        for item in sale.items.all()
+        (
+            '<tr>'
+            f'<td>{escape(item.product.name)}</td>'
+            f'<td style="text-align:center">{_fmt_qty(item.quantity)}</td>'
+            f'<td style="text-align:right">{_fmt_money(item.unit_price)}</td>'
+            f'<td style="text-align:right">{_fmt_money(item.total)}</td>'
+            '</tr>'
+        )
+        for item in sale.items.select_related('product')
     )
     return f'''<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>{sale.reference}</title>
+<html><head><meta charset="utf-8"><title>{escape(sale.reference)}</title>
 <style>
 body{{font-family:monospace;max-width:300px;margin:0 auto;padding:16px;font-size:12px}}
 h1{{font-size:16px;text-align:center;margin:0}}
 table{{width:100%;border-collapse:collapse;margin:12px 0}}
-td{{padding:4px 0}} .total{{font-weight:bold;font-size:14px}}
+th{{text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:4px 0;border-bottom:1px dashed #000}}
+th:first-child{{text-align:left}}
+th:nth-child(2){{text-align:center}}
+td{{padding:4px 0;vertical-align:top}}
+td:nth-child(2){{text-align:center;white-space:nowrap}}
+.total{{font-weight:bold;font-size:14px}}
 hr{{border:none;border-top:1px dashed #000}}
 </style></head><body>
-<h1>{company.name}</h1>
-<p style="text-align:center">{sale.branch.name}<br>{sale.created_at.strftime("%d/%m/%Y %H:%M")}</p>
+<h1>{escape(company.name)}</h1>
+<p style="text-align:center">{escape(sale.branch.name)}<br>{sale.created_at.strftime("%d/%m/%Y %H:%M")}</p>
 <hr>
-<p><strong>{sale.reference}</strong></p>
-<table>{lines}</table>
+<p><strong>{escape(sale.reference)}</strong></p>
+<table>
+<thead><tr><th>Article</th><th>Qté</th><th>P.U.</th><th>Total</th></tr></thead>
+<tbody>{lines}</tbody>
+</table>
 <hr>
-<p>Sous-total: {sale.subtotal:,.0f} XOF</p>
-<p>TVA: {sale.tax_amount:,.0f} XOF</p>
-<p class="total">TOTAL: {sale.total:,.0f} XOF</p>
+<p>Sous-total: {_fmt_money(sale.subtotal)} XOF</p>
+<p>TVA: {_fmt_money(sale.tax_amount)} XOF</p>
+<p class="total">TOTAL: {_fmt_money(sale.total)} XOF</p>
 <p style="text-align:center;margin-top:16px">Merci de votre visite !</p>
 </body></html>'''
 
@@ -50,6 +77,25 @@ class SaleViewSet(CompanyQuerysetMixin, viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['branch', 'status', 'payment_status']
     search_fields = ['reference']
     ordering_fields = ['created_at', 'total']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        from accounts.utils import get_user_scope, user_has_flag
+        user = self.request.user
+        scope = get_user_scope(user)
+        if scope.get('is_cashier'):
+            # Caissier : uniquement ses ventes
+            qs = qs.filter(seller=user)
+            if scope.get('branch_id'):
+                qs = qs.filter(branch_id=scope['branch_id'])
+        elif scope.get('is_pos_manager') and scope.get('branch_id'):
+            qs = qs.filter(branch_id=scope['branch_id'])
+        elif not user.is_company_admin and not user_has_flag(user, 'can_view_profit'):
+            # Si seulement « ses ventes » sans vue globale
+            if user_has_flag(user, 'can_view_own_sales') and not user_has_flag(user, 'can_modify_stock'):
+                if scope.get('branch_id'):
+                    qs = qs.filter(branch_id=scope['branch_id'])
+        return qs
 
     @action(detail=False, methods=['post'])
     def checkout(self, request):
@@ -87,15 +133,21 @@ class SaleViewSet(CompanyQuerysetMixin, viewsets.ReadOnlyModelViewSet):
 
         results = []
         for entry in sales_data:
-            serializer = SaleCreateSerializer(data={**entry, 'is_offline': True}, context={'request': request})
+            ref = (entry.get('client_reference') or '').strip()
+            serializer = SaleCreateSerializer(
+                data={**entry, 'is_offline': True},
+                context={'request': request},
+            )
             if not serializer.is_valid():
                 results.append({
-                    'client_reference': entry.get('client_reference'),
+                    'client_reference': ref,
                     'ok': False,
                     'detail': serializer.errors,
+                    'retry': False,
                 })
                 continue
             data = serializer.validated_data
+            ref = (data.get('client_reference') or ref or '').strip()
             try:
                 sale = services.create_sale(
                     company=request.user.company,
@@ -109,18 +161,26 @@ class SaleViewSet(CompanyQuerysetMixin, viewsets.ReadOnlyModelViewSet):
                     notes=data.get('notes', ''),
                     warehouse=data.get('warehouse'),
                     is_offline=True,
-                    client_reference=(data.get('client_reference') or None),
+                    client_reference=ref or None,
                 )
                 results.append({
-                    'client_reference': data.get('client_reference') or '',
+                    'client_reference': ref,
                     'ok': True,
                     'sale': SaleSerializer(sale).data,
                 })
             except services.SaleError as exc:
                 results.append({
-                    'client_reference': data.get('client_reference') or '',
+                    'client_reference': ref,
                     'ok': False,
                     'detail': str(exc),
+                    'retry': True,
+                })
+            except OperationalError:
+                results.append({
+                    'client_reference': ref,
+                    'ok': False,
+                    'detail': 'Base temporairement occupée, réessayez.',
+                    'retry': True,
                 })
 
         synced = sum(1 for r in results if r['ok'])

@@ -1,5 +1,5 @@
 """
-Django settings for Inventra backend.
+Django settings for Stokeya backend.
 """
 
 from datetime import timedelta
@@ -13,9 +13,12 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-change-me-in-prod
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1,10.0.2.2,testserver' if not DEBUG else '*',
+    default='localhost,127.0.0.1,10.0.2.2,testserver',
     cast=Csv(),
 )
+if DEBUG:
+    # Expo Go / LAN phones send Host: 192.168.x.x:8000
+    ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -28,7 +31,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
-    'common',
+    'common.apps.CommonConfig',
     'companies',
     'accounts',
     'authentication',
@@ -50,6 +53,7 @@ INSTALLED_APPS = [
     'settings_app',
     'dashboard',
     'reports',
+    'shops',
 ]
 
 MIDDLEWARE = [
@@ -100,6 +104,10 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            # Évite les 500 "database is locked" (sync offline, plusieurs requêtes)
+            'OPTIONS': {
+                'timeout': 30,
+            },
         }
     }
 
@@ -137,7 +145,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'common.pagination.FlexiblePagination',
     'PAGE_SIZE': 20,
 }
 
@@ -159,8 +167,8 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=DEBUG, cast=bo
 WAVE_API_KEY = config('WAVE_API_KEY', default='')
 WAVE_WEBHOOK_SECRET = config('WAVE_WEBHOOK_SECRET', default='')
 WAVE_API_BASE_URL = config('WAVE_API_BASE_URL', default='https://api.wave.com')
-WAVE_SUCCESS_URL = config('WAVE_SUCCESS_URL', default='https://inventra.sn/payment/success')
-WAVE_ERROR_URL = config('WAVE_ERROR_URL', default='https://inventra.sn/payment/error')
+WAVE_SUCCESS_URL = config('WAVE_SUCCESS_URL', default='https://stokeya.com/payment/success')
+WAVE_ERROR_URL = config('WAVE_ERROR_URL', default='https://stokeya.com/payment/error')
 
 # Orange Money Web Payment
 ORANGE_MONEY_CLIENT_ID = config('ORANGE_MONEY_CLIENT_ID', default='')
@@ -182,6 +190,23 @@ MTN_MOMO_DEFAULT_PAYER = config('MTN_MOMO_DEFAULT_PAYER', default='22997000000')
 
 # URL de base pour les redirections mock en DEBUG
 PAYMENT_MOCK_BASE_URL = config('PAYMENT_MOCK_BASE_URL', default='http://localhost:5173')
+
+# PayPal REST API (https://developer.paypal.com)
+PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID', default='')
+PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
+PAYPAL_MODE = config('PAYPAL_MODE', default='sandbox')  # sandbox | live
+PAYPAL_CURRENCY = config('PAYPAL_CURRENCY', default='EUR')
+PAYPAL_XOF_RATE = config('PAYPAL_XOF_RATE', default='655.957', cast=float)
+PAYPAL_RETURN_URL = config('PAYPAL_RETURN_URL', default='http://localhost:5173/payment/success')
+PAYPAL_CANCEL_URL = config('PAYPAL_CANCEL_URL', default='http://localhost:5173/payment/error')
+PAYPAL_WEBHOOK_ID = config('PAYPAL_WEBHOOK_ID', default='')
+
+# SasPay (https://docs.saspay.me) — clé secrète uniquement côté Django
+SASPAY_SECRET_KEY = config('SASPAY_SECRET_KEY', default='')
+SASPAY_WEBHOOK_SECRET = config('SASPAY_WEBHOOK_SECRET', default='')
+SASPAY_API_URL = config('SASPAY_API_URL', default='https://api.saspay.me/api/v1')
+SASPAY_RETURN_URL = config('SASPAY_RETURN_URL', default='https://stokeya.com/payment/success')
+SASPAY_DEFAULT_COUNTRY = config('SASPAY_DEFAULT_COUNTRY', default='SN')
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

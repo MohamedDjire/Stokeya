@@ -11,6 +11,7 @@ import {
   SegmentedButtons,
   Text,
 } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import * as Print from 'expo-print';
@@ -27,7 +28,7 @@ import { colors, radius, spacing } from '../theme/colors';
 const SCREEN_W = Dimensions.get('window').width;
 const CHART_W = SCREEN_W - spacing.md * 2 - spacing.md * 2;
 
-const PIE_COLORS = ['#1565C0', '#00897B', '#FF6F00', '#8E24AA', '#43A047', '#E53935'];
+const PIE_COLORS = ['#0D9488', '#00897B', '#FF6F00', '#8E24AA', '#43A047', '#E53935'];
 
 const baseChartConfig = {
   backgroundGradientFrom: colors.surface,
@@ -105,7 +106,7 @@ export default function ReportsScreen() {
       const html = buildReportHtml(data, { branchName, sellerName });
       const { uri } = await Print.printToFileAsync({ html });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Rapport Inventra' });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Rapport Stokeya' });
       }
     } catch {
       Alert.alert('Export', 'Impossible de générer le PDF.');
@@ -127,7 +128,7 @@ export default function ReportsScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Statistiques" subtitle="Analyse de performance" />
         <Menu
@@ -144,7 +145,7 @@ export default function ReportsScreen() {
           <Menu.Item leadingIcon="file-pdf-box" title="Exporter en PDF" onPress={handleExportPdf} />
           <Menu.Item leadingIcon="file-excel" title="Exporter en Excel" onPress={handleExportExcel} />
         </Menu>
-      </Appbar.Header>
+      </AppHeader>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -377,18 +378,18 @@ function buildReportHtml(d: Analytics, ctx: { branchName?: string; sellerName?: 
   return `
   <html><head><meta charset="utf-8" /><style>
     body { font-family: -apple-system, Roboto, sans-serif; color: #1A1A2E; padding: 24px; }
-    h1 { color: #1565C0; margin-bottom: 4px; }
+    h1 { color: #0D9488; margin-bottom: 4px; }
     .meta { color: #6B7280; font-size: 12px; margin-bottom: 16px; }
-    h2 { color: #1565C0; font-size: 15px; margin-top: 24px; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; }
+    h2 { color: #0D9488; font-size: 15px; margin-top: 24px; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-    th { background: #1565C0; color: #fff; padding: 6px; text-align: left; }
+    th { background: #0D9488; color: #fff; padding: 6px; text-align: left; }
     td { padding: 6px; border-bottom: 1px solid #E5E7EB; }
     .kpis { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
     .kpi { flex: 1; min-width: 130px; background: #F0F4F8; border-radius: 8px; padding: 12px; }
     .kpi .v { font-size: 18px; font-weight: 700; }
     .kpi .l { color: #6B7280; font-size: 11px; }
   </style></head><body>
-    <h1>Rapport statistique — Inventra</h1>
+    <h1>Rapport statistique — Stokeya</h1>
     <div class="meta">Période : ${periodLabel} · Boutique : ${ctx.branchName || 'Toutes'} · Vendeur : ${ctx.sellerName || 'Tous'}</div>
     <div class="kpis">
       <div class="kpi"><div class="l">Chiffre d'affaires</div><div class="v">${money(d.kpis.revenue)}</div><div class="l">${d.kpis.revenue_growth >= 0 ? '▲' : '▼'} ${Math.abs(d.kpis.revenue_growth)}%</div></div>

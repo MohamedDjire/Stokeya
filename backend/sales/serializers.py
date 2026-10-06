@@ -33,11 +33,26 @@ class SaleCreateSerializer(serializers.Serializer):
         user = self.context['request'].user
         company = user.company
 
+        from accounts.utils import get_user_scope, user_has_flag
         from branches.models import Branch, CashRegister
+
+        scope = get_user_scope(user)
+        if not user_has_flag(user, 'can_sell'):
+            raise serializers.ValidationError({'detail': 'Vous n\'êtes pas autorisé à effectuer des ventes.'})
+
+        # Forcer le périmètre caissier / responsable PDV
+        if scope.get('branch_id') and (scope.get('is_cashier') or scope.get('is_pos_manager')):
+            data['branch_id'] = scope['branch_id']
+        if scope.get('cash_register_id') and scope.get('is_cashier'):
+            data['cash_register_id'] = scope['cash_register_id']
+
         try:
             data['branch'] = Branch.objects.get(id=data['branch_id'], company=company)
         except Branch.DoesNotExist:
             raise serializers.ValidationError({'branch_id': 'Boutique introuvable.'})
+
+        if scope.get('is_cashier') and scope.get('branch_id') and data['branch'].id != scope['branch_id']:
+            raise serializers.ValidationError({'branch_id': 'Vous ne pouvez vendre que sur votre point de vente.'})
 
         if data.get('customer_id'):
             try:
@@ -54,8 +69,17 @@ class SaleCreateSerializer(serializers.Serializer):
                 )
             except CashRegister.DoesNotExist:
                 raise serializers.ValidationError({'cash_register_id': 'Caisse introuvable.'})
+            if scope.get('is_cashier') and scope.get('cash_register_id'):
+                if data['cash_register'].id != scope['cash_register_id']:
+                    raise serializers.ValidationError({
+                        'cash_register_id': 'Vous ne pouvez utiliser que votre caisse assignée.',
+                    })
         else:
             data['cash_register'] = None
+            if scope.get('is_cashier') and scope.get('cash_register_id'):
+                data['cash_register'] = CashRegister.objects.filter(
+                    id=scope['cash_register_id'], company=company,
+                ).first()
 
         if data.get('warehouse_id'):
             from warehouses.models import Warehouse
@@ -68,6 +92,13 @@ class SaleCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError({'warehouse_id': 'Entrepôt introuvable.'})
         else:
             data['warehouse'] = None
+
+        # Remise / prix : flags
+        discount = data.get('discount_amount') or 0
+        if discount and not user_has_flag(user, 'can_discount'):
+            raise serializers.ValidationError({
+                'discount_amount': 'Vous n\'êtes pas autorisé à accorder une remise.',
+            })
 
         return data
 

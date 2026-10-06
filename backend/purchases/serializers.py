@@ -75,13 +75,25 @@ class GoodsReceiptCreateSerializer(serializers.Serializer):
         company = self.context['request'].user.company
         from warehouses.models import Warehouse
         try:
-            data['warehouse'] = Warehouse.objects.get(
+            data['warehouse'] = Warehouse.objects.select_related('branch').get(
                 id=data['warehouse_id'],
                 branch__company=company,
                 is_active=True,
             )
         except Warehouse.DoesNotExist:
             raise serializers.ValidationError({'warehouse_id': 'Entrepôt introuvable.'})
+
+        warehouse = data['warehouse']
+        branch = warehouse.branch
+        # Point de vente : pas d'achat fournisseur direct sauf option activée
+        if warehouse.is_pos_stock and not branch.is_main and not branch.allow_supplier_receipts:
+            raise serializers.ValidationError({
+                'warehouse_id': (
+                    'Un point de vente ne peut pas recevoir un achat fournisseur. '
+                    'Recevez au siège ou en entrepôt, puis approvisionnez le magasin '
+                    '(ou activez « Autoriser les achats fournisseurs » sur ce PDV).'
+                ),
+            })
 
         items = []
         for item in data['items']:

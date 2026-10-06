@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { createExpense, createExpenseCategory, fetchExpenseCategories, fetchExpenses } from '../api/expenses';
 import { colors, spacing } from '../theme/colors';
@@ -49,10 +50,10 @@ export default function ExpensesScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Dépenses" />
-      </Appbar.Header>
+      </AppHeader>
 
       <View style={styles.form}>
         <TextInput label="Montant (XOF)" mode="outlined" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" style={styles.input} />

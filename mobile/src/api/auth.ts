@@ -1,4 +1,5 @@
 import { api, clearTokens, saveTokens } from './client';
+import { cached, cacheInvalidate } from './cache';
 
 export interface User {
   id: number;
@@ -98,6 +99,10 @@ export interface Product {
   unit_name: string;
   purchase_price: string;
   sale_price: string;
+  wholesale_price?: string | null;
+  wholesale_min_qty?: string | number | null;
+  wholesale_discount_type?: 'price' | 'percent' | 'amount';
+  wholesale_discount_value?: string | null;
   tax_rate: string;
   min_stock: string;
   max_stock: string | null;
@@ -126,6 +131,13 @@ export async function register(payload: {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  whatsapp?: string;
+  shop_slug?: string;
+  wave_number?: string;
+  orange_money_number?: string;
+  payment_timing?: string;
 }) {
   const { data } = await api.post('/auth/register/', payload);
   return data;
@@ -146,8 +158,10 @@ export async function updateProfile(payload: {
 }
 
 export async function fetchDashboard(): Promise<DashboardData> {
-  const { data } = await api.get('/dashboard/');
-  return data;
+  return cached('dashboard', async () => {
+    const { data } = await api.get('/dashboard/');
+    return data;
+  }, 30_000);
 }
 
 export async function logout() {
@@ -174,10 +188,13 @@ export async function confirmPasswordReset(payload: {
 }
 
 export async function fetchProducts(search?: string): Promise<Product[]> {
-  const { data } = await api.get('/products/', {
-    params: search ? { search } : undefined,
-  });
-  return data.results;
+  const key = `products:${search || ''}`;
+  return cached(key, async () => {
+    const { data } = await api.get('/products/', {
+      params: { search: search || undefined, page_size: 200 },
+    });
+    return data.results;
+  }, 30_000);
 }
 
 export async function fetchUnits(): Promise<OptionItem[]> {
@@ -204,6 +221,10 @@ export async function createProduct(payload: {
   unit: number;
   purchase_price: string;
   sale_price: string;
+  wholesale_price?: string | null;
+  wholesale_min_qty?: string;
+  wholesale_discount_type?: 'price' | 'percent' | 'amount';
+  wholesale_discount_value?: string | null;
   tax_rate?: string;
   min_stock?: string;
   max_stock?: string;
@@ -211,5 +232,6 @@ export async function createProduct(payload: {
   barcodes?: Array<{ code: string; is_primary: boolean }>;
 }) {
   const { data } = await api.post('/products/', payload);
+  cacheInvalidate('products:');
   return data as Product;
 }

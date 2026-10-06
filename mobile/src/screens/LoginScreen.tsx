@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Text, TextInput, HelperText } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Button, TextInput, HelperText } from 'react-native-paper';
+import StokeyaLogo from '../components/StokeyaLogo';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError } from '../store/authSlice';
@@ -23,13 +23,7 @@ export default function LoginScreen({ navigation }: Props) {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
-          <View style={styles.logoCircle}>
-            <MaterialCommunityIcons name="store" size={48} color={colors.primary} />
-          </View>
-          <Text variant="headlineLarge" style={styles.title}>Inventra</Text>
-          <Text variant="bodyLarge" style={styles.subtitle}>
-            Gestion stock & caisse pour votre commerce
-          </Text>
+          <StokeyaLogo size={72} tagline="Gérez votre stock, développez votre activité" />
         </View>
 
         <View style={styles.form}>
@@ -85,17 +79,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   logoWrap: { alignItems: 'center', marginBottom: spacing.xl },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: radius.xl,
-    backgroundColor: colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  title: { fontWeight: '800', color: colors.primary },
-  subtitle: { textAlign: 'center', color: colors.textMuted, marginTop: spacing.sm },
   form: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

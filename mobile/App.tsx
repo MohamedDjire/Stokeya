@@ -16,23 +16,24 @@ import AppNavigator from './src/navigation/AppNavigator';
 
 function RootNavigator() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, isLoading } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, isBootstrapping } = useAppSelector((s) => s.auth);
 
   useEffect(() => {
     dispatch(bootstrapAuth());
   }, [dispatch]);
 
-  if (isLoading) {
+  if (isBootstrapping) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <MaterialCommunityIcons name="store" size={64} color={colors.primary} />
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.secondary }}>
+        <MaterialCommunityIcons name="warehouse" size={56} color="#FFFFFF" />
+        <ActivityIndicator size="large" color="#FFFFFF" style={{ marginTop: 24 }} />
       </View>
     );
   }
 
   return (
     <NavigationContainer>
+      <StatusBar style="dark" />
       {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
@@ -49,7 +50,6 @@ export default function App() {
           }}
         >
           <Portal.Host>
-            <StatusBar style="dark" />
             <RootNavigator />
           </Portal.Host>
         </PaperProvider>

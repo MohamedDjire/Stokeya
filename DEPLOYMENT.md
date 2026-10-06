@@ -1,4 +1,4 @@
-# Déploiement Inventra
+# Déploiement Stokeya
 
 Ce document prépare le projet pour la publication mobile et la mise en ligne web.
 
@@ -16,9 +16,9 @@ Ce document prépare le projet pour la publication mobile et la mise en ligne we
    - `npx eas-cli init`
 2. Remplacer `expo.extra.eas.projectId` dans `mobile/app.json`
 3. Définir l'API de production :
-   - `EXPO_PUBLIC_API_URL=https://api.inventra.sn/api/v1`
+   - `EXPO_PUBLIC_API_URL=https://api.stokeya.com/api/v1`
 4. Vérifier le package Android :
-   - `com.inventra.app`
+   - `com.stokeya.app`
    - Si vous voulez un autre identifiant, le changer avant la première publication
 
 ### Build de test
@@ -51,16 +51,16 @@ Le build de production génère un `.aab` à envoyer dans Google Play Console.
 ### Variables backend à configurer
 - `SECRET_KEY`
 - `DEBUG=False`
-- `ALLOWED_HOSTS=api.inventra.sn`
-- `CORS_ALLOWED_ORIGINS=https://inventra.sn`
+- `ALLOWED_HOSTS=api.stokeya.com`
+- `CORS_ALLOWED_ORIGINS=https://stokeya.com`
 - `WAVE_API_KEY`
 - `WAVE_WEBHOOK_SECRET`
 - `WAVE_SUCCESS_URL`
 - `WAVE_ERROR_URL`
 
 ### Variables web à configurer
-- `VITE_API_URL=https://api.inventra.sn/api/v1`
-- `VITE_APP_URL=https://inventra.sn`
+- `VITE_API_URL=https://api.stokeya.com/api/v1`
+- `VITE_APP_URL=https://stokeya.com`
 
 ## 3. Ordre conseillé de mise en production
 
@@ -84,8 +84,8 @@ Le build de production génère un `.aab` à envoyer dans Google Play Console.
 - [ ] Tests sur appareil réel
 
 ### Web
-- [ ] Domaine `inventra.sn` configuré
-- [ ] Sous-domaine `api.inventra.sn` configuré
+- [ ] Domaine `stokeya.com` configuré
+- [ ] Sous-domaine `api.stokeya.com` configuré
 - [ ] HTTPS actif
 - [ ] CORS configuré
 - [ ] Variables Wave en production

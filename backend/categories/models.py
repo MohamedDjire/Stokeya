@@ -23,7 +23,7 @@ class Category(CompanyScopedModel):
 
 class Tag(CompanyScopedModel):
     name = models.CharField(max_length=100)
-    color = models.CharField(max_length=7, default='#1565C0')
+    color = models.CharField(max_length=7, default='#0D9488')
     is_active = models.BooleanField(default=True)
 
     class Meta:

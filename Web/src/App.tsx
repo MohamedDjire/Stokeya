@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { bootstrapAuth } from './store/authSlice';
+import { loadPreferences, syncRuntimeFromPayload } from './store/prefsSlice';
+import { getLocaleVersion } from './locale/runtime';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -23,6 +25,7 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const SubscriptionPage = lazy(() => import('./pages/SubscriptionPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const PreferencesPage = lazy(() => import('./pages/PreferencesPage'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage'));
 const PaymentSuccessPage = lazy(() => import('./pages/PaymentSuccessPage'));
 const PaymentErrorPage = lazy(() => import('./pages/PaymentErrorPage'));
@@ -32,6 +35,10 @@ const ScanPage = lazy(() => import('./pages/ScanPage'));
 const LabelsPage = lazy(() => import('./pages/LabelsPage'));
 const TraceabilityPage = lazy(() => import('./pages/TraceabilityPage'));
 const StockRequestsPage = lazy(() => import('./pages/StockRequestsPage'));
+const StockTransfersPage = lazy(() => import('./pages/StockTransfersPage'));
+const PosOutletPage = lazy(() => import('./pages/PosOutletPage'));
+const ShopPage = lazy(() => import('./pages/ShopPage'));
+const ShopOrdersPage = lazy(() => import('./pages/ShopOrdersPage'));
 
 function Loader() {
   return (
@@ -49,7 +56,22 @@ export default function App() {
     dispatch(bootstrapAuth());
   }, [dispatch]);
 
-  if (status === 'idle' || status === 'loading') {
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    let cancelled = false;
+    const versionAtStart = getLocaleVersion();
+    dispatch(loadPreferences())
+      .unwrap()
+      .then((data) => {
+        // Ne pas écraser un changement langue/devise déjà fait par l’utilisateur
+        if (cancelled || getLocaleVersion() !== versionAtStart) return;
+        syncRuntimeFromPayload(data);
+      })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, [dispatch, status]);
+
+  if (status === 'idle' || status === 'bootstrapping') {
     return (
       <Box sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress />
@@ -63,6 +85,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/shop/:slug" element={<ShopPage />} />
+        <Route path="/s/:code" element={<ShopPage />} />
 
         <Route
           element={
@@ -80,9 +104,13 @@ export default function App() {
           <Route path="/sales" element={<SalesPage />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/sites" element={<SitesPage />} />
+          <Route path="/sites/pos/:branchId" element={<PosOutletPage />} />
+          <Route path="/warehouses" element={<SitesPage />} />
           <Route path="/scan" element={<ScanPage />} />
           <Route path="/traceability" element={<TraceabilityPage />} />
           <Route path="/requests" element={<StockRequestsPage />} />
+          <Route path="/transfers" element={<StockTransfersPage />} />
+          <Route path="/orders" element={<ShopOrdersPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/purchases" element={<PurchasesPage />} />
@@ -90,6 +118,7 @@ export default function App() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment/sale/:saleId" element={<PaymentPage />} />
           <Route path="/payment/subscription" element={<PaymentPage />} />

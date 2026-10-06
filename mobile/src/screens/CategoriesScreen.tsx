@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Chip, Searchbar, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import {
   createCategory,
@@ -26,7 +27,7 @@ export default function CategoriesScreen() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [categoryName, setCategoryName] = useState('');
   const [tagName, setTagName] = useState('');
-  const [tagColor, setTagColor] = useState('#1565C0');
+  const [tagColor, setTagColor] = useState('#0D9488');
 
   const load = useCallback(async (q?: string) => {
     const [c, t] = await Promise.all([fetchCategories(q), fetchTags(q)]);
@@ -68,11 +69,11 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Catégories & Tags" subtitle={`${count} élément(s)`} />
         <Appbar.Action icon="plus" onPress={() => setShowForm(!showForm)} />
-      </Appbar.Header>
+      </AppHeader>
 
       <SegmentedButtons
         value={tab}

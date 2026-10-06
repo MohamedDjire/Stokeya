@@ -18,8 +18,12 @@ import { fetchProductByBarcode } from '../api/batches';
 import type { Product } from '../api/auth';
 import { getApiErrorMessage } from '../api/client';
 import { formatCurrency } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 export default function ScanPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const inputRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState('');
   const [product, setProduct] = useState<Product | null>(null);
@@ -47,13 +51,13 @@ export default function ScanPage() {
       setCode('');
       focusInput();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Produit introuvable pour ce code-barres.'));
+      setError(getApiErrorMessage(err, tr('Produit introuvable pour ce code-barres.')));
       setCode('');
       focusInput();
     } finally {
       setLoading(false);
     }
-  }, [focusInput]);
+  }, [focusInput, tr]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -73,13 +77,16 @@ export default function ScanPage() {
     || '—';
 
   const stockQty = Number(product?.total_stock || 0);
-  const minStock = Number(product?.min_stock || 0);
+  const stockStatus = product?.stock_status
+    || (stockQty <= 0 ? 'out_of_stock' as const : 'ok' as const);
+  const stockColor = stockStatus === 'out_of_stock' ? 'error' as const : stockStatus === 'low' ? 'warning' as const : 'success' as const;
+  const stockLabel = stockStatus === 'out_of_stock' ? tr('Rupture') : stockStatus === 'low' ? tr('Stock faible') : tr('OK');
 
   return (
     <Box>
       <PageHeader
-        title="Scan direct"
-        subtitle="Scanner USB/Bluetooth, caméra ou saisie manuelle"
+        title={tr('Scan direct')}
+        subtitle={tr('Scanner USB/Bluetooth, caméra ou saisie manuelle')}
       />
 
       <Card sx={{ mb: 3, maxWidth: 640 }}>
@@ -89,15 +96,15 @@ export default function ScanPage() {
               <QrCodeScannerIcon color="primary" sx={{ fontSize: 40, mt: 1 }} />
               <TextField
                 inputRef={inputRef}
-                label="Code-barres"
-                placeholder="Scannez ou saisissez le code puis Entrée"
+                label={tr('Code-barres')}
+                placeholder={tr('Scannez ou saisissez le code puis Entrée')}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={handleKeyDown}
                 fullWidth
                 autoFocus
                 disabled={loading}
-                helperText="Compatible lecteurs USB/Bluetooth (mode clavier)."
+                helperText={tr('Compatible lecteurs USB/Bluetooth (mode clavier).')}
                 inputProps={{ style: { fontSize: 24, letterSpacing: 2 } }}
               />
             </Stack>
@@ -107,7 +114,7 @@ export default function ScanPage() {
               onClick={() => setCameraOpen(true)}
               sx={{ alignSelf: 'flex-start' }}
             >
-              Scanner avec la caméra
+              {tr('Scanner avec la caméra')}
             </Button>
           </Stack>
         </CardContent>
@@ -121,26 +128,26 @@ export default function ScanPage() {
             <Stack spacing={2}>
               <Typography variant="h5" fontWeight={700}>{product.name}</Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Chip label={`SKU: ${product.sku}`} variant="outlined" />
-                <Chip label={`Code: ${primaryBarcode}`} variant="outlined" />
+                <Chip label={`${tr('SKU')}: ${product.sku}`} variant="outlined" />
+                <Chip label={`${tr('Code')}: ${primaryBarcode}`} variant="outlined" />
                 {product.category_name && <Chip label={product.category_name} size="small" />}
               </Stack>
               <Stack direction="row" spacing={4}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Prix vente</Typography>
+                  <Typography variant="caption" color="text.secondary">{tr('Prix vente')}</Typography>
                   <Typography variant="h6" color="primary.main">{formatCurrency(product.sale_price)}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Prix achat</Typography>
+                  <Typography variant="caption" color="text.secondary">{tr('Prix achat')}</Typography>
                   <Typography variant="h6">{formatCurrency(product.purchase_price)}</Typography>
                 </Box>
                 <Box>
-                  <Typography variant="caption" color="text.secondary">Stock total</Typography>
+                  <Typography variant="caption" color="text.secondary">{tr('Stock total')}</Typography>
                   <Typography variant="h6">
                     <Chip
                       size="small"
-                      label={stockQty}
-                      color={stockQty <= 0 ? 'error' : stockQty <= minStock ? 'warning' : 'success'}
+                      label={`${stockQty} · ${stockLabel}`}
+                      color={stockColor}
                       variant="outlined"
                     />
                   </Typography>

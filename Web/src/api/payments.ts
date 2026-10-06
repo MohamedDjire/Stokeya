@@ -1,7 +1,7 @@
 import { api } from './client';
 import type { Sale } from './sales';
 
-export type PaymentProviderCode = 'wave' | 'orange_money' | 'mtn_money';
+export type PaymentProviderCode = 'wave' | 'orange_money' | 'mtn_money' | 'paypal' | 'saspay';
 
 export interface PaymentProvider {
   code: PaymentProviderCode;
@@ -27,6 +27,8 @@ export interface SubscriptionWaveCheckout extends WaveCheckout {
   plan_code: string;
   plan_name: string;
   billing_cycle: string;
+  months?: number;
+  status_label?: string;
 }
 
 export interface PaymentStatus {
@@ -64,17 +66,56 @@ export async function createWaveCheckout(
   return data as { checkout: WaveCheckout; sale: Sale };
 }
 
+export interface SasPayMethodGroup {
+  code: 'mobile_money' | 'card' | 'other' | string;
+  label: string;
+  methods: { code: string; label: string }[];
+}
+
+export async function fetchSasPayMethods(): Promise<{ country: string; groups: SasPayMethodGroup[] }> {
+  const { data } = await api.get('/payments/saspay/methods/');
+  return data as { country: string; groups: SasPayMethodGroup[] };
+}
+
+export async function createSasPaySaleCheckout(saleId: number) {
+  const { data } = await api.post('/payments/saspay/checkout/', { sale_id: saleId });
+  return data as { checkout: WaveCheckout; sale: Sale };
+}
+
+export async function createSasPaySubscriptionCheckout(
+  planCode: string,
+  billingCycle: 'monthly' | 'annual',
+  months?: number,
+) {
+  const { data } = await api.post('/payments/saspay/checkout/', {
+    plan_code: planCode,
+    billing_cycle: billingCycle,
+    months: months ?? (billingCycle === 'annual' ? 12 : 1),
+  });
+  return data as { checkout: SubscriptionWaveCheckout };
+}
+
+export async function fetchSasPayStatus(params: {
+  subscription_checkout_id?: number;
+  client_reference?: string;
+}) {
+  const { data } = await api.get('/payments/saspay/status/', { params });
+  return data as PaymentStatus & { client_reference?: string; detail?: string };
+}
+
 export async function createSubscriptionWaveCheckout(
   planCode: string,
   billingCycle: 'monthly' | 'annual',
   provider: PaymentProviderCode = 'wave',
   phone?: string,
+  months?: number,
 ) {
   const { data } = await api.post('/payments/wave/subscription/', {
     plan_code: planCode,
     billing_cycle: billingCycle,
     provider,
     phone,
+    months: months ?? (billingCycle === 'annual' ? 12 : 1),
   });
   return data as { checkout: SubscriptionWaveCheckout };
 }
@@ -93,4 +134,21 @@ export async function mockCompletePayment(clientReference: string, provider: Pay
     provider,
   });
   return data;
+}
+
+export async function capturePayPalOrder(orderId: string) {
+  const { data } = await api.post('/payments/paypal/capture/', {
+    order_id: orderId,
+  }, { timeout: 45000 });
+  return data as { status: string; order_id: string };
+}
+
+export async function fetchPayPalConfig() {
+  const { data } = await api.get('/payments/paypal/config/');
+  return data as {
+    configured: boolean;
+    client_id: string;
+    mode: string;
+    currency: string;
+  };
 }

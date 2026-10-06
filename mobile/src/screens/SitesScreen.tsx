@@ -1,78 +1,109 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { Appbar, Button, Card, Searchbar, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Appbar, Button, Card, Checkbox, Chip, Searchbar, SegmentedButtons, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import {
   createBranch,
-  createLocation,
   createWarehouse,
   fetchBranches,
-  fetchLocations,
+  fetchOnlineShop,
   fetchWarehouses,
+  shareShopLink,
+  updateBranch,
+  updateOnlineShop,
   type Branch,
+  type OnlineShop,
   type Warehouse,
-  type WarehouseLocation,
 } from '../api/sites';
 import { colors, spacing } from '../theme/colors';
 
-type Tab = 'branches' | 'warehouses' | 'locations';
+type Tab = 'main' | 'pos' | 'warehouses' | 'shop';
 
 export default function SitesScreen() {
   const navigation = useNavigation();
-  const [tab, setTab] = useState<Tab>('branches');
-  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<Tab>('main');
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-
   const [branches, setBranches] = useState<Branch[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [locations, setLocations] = useState<WarehouseLocation[]>([]);
+  const [shop, setShop] = useState<OnlineShop | null>(null);
+  const [showPosForm, setShowPosForm] = useState(false);
+  const [posForm, setPosForm] = useState({ name: '', phone: '', address: '' });
+  const [whForm, setWhForm] = useState({ name: '' });
+  const [showWhForm, setShowWhForm] = useState(false);
 
-  const [branchForm, setBranchForm] = useState({ name: '', phone: '', address: '' });
-  const [warehouseForm, setWarehouseForm] = useState({ name: '', branch: 0 });
-  const [locationForm, setLocationForm] = useState({ code: '', name: '', warehouse: 0 });
+  const main = useMemo(() => branches.find((b) => b.is_main) || null, [branches]);
+  const posList = useMemo(() => branches.filter((b) => !b.is_main), [branches]);
+  const storageWh = useMemo(() => warehouses.filter((w) => !w.is_pos_stock), [warehouses]);
 
-  const load = useCallback(async (q?: string) => {
-    const [b, w, l] = await Promise.all([
-      fetchBranches(q),
-      fetchWarehouses(q),
-      fetchLocations(q),
+  const load = useCallback(async () => {
+    const [b, w, s] = await Promise.all([
+      fetchBranches(),
+      fetchWarehouses(),
+      fetchOnlineShop().catch(() => null),
     ]);
     setBranches(b);
     setWarehouses(w);
-    setLocations(l);
-    setWarehouseForm((f) => (f.branch ? f : { ...f, branch: b[0]?.id || 0 }));
-    setLocationForm((f) => (f.warehouse ? f : { ...f, warehouse: w[0]?.id || 0 }));
+    if (s) setShop(s);
   }, []);
 
   useEffect(() => {
     load().finally(() => setLoading(false));
   }, [load]);
 
-  const handleSearch = async (v: string) => {
-    setSearch(v);
-    await load(v.trim() || undefined);
-  };
-
-  const handleCreate = async () => {
+  const createPos = async () => {
+    if (!posForm.name.trim()) return;
     setSaving(true);
     try {
-      if (tab === 'branches') {
-        if (!branchForm.name.trim()) return;
-        await createBranch(branchForm);
-        setBranchForm({ name: '', phone: '', address: '' });
-      } else if (tab === 'warehouses') {
-        if (!warehouseForm.name.trim() || !warehouseForm.branch) return;
-        await createWarehouse(warehouseForm);
-        setWarehouseForm({ name: '', branch: branches[0]?.id || 0 });
-      } else {
-        if (!locationForm.code.trim() || !locationForm.name.trim() || !locationForm.warehouse) return;
-        await createLocation(locationForm);
-        setLocationForm({ code: '', name: '', warehouse: warehouses[0]?.id || 0 });
-      }
-      setShowForm(false);
-      await load(search.trim() || undefined);
+      await createBranch({ ...posForm, is_active: true });
+      setPosForm({ name: '', phone: '', address: '' });
+      setShowPosForm(false);
+      await load();
+    } catch {
+      Alert.alert('Erreur', 'Impossible de créer le point de vente (limite de plan ?).');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createStorageWh = async () => {
+    if (!whForm.name.trim() || !main) return;
+    setSaving(true);
+    try {
+      await createWarehouse({
+        name: whForm.name,
+        branch: main.id,
+        is_default: false,
+        is_active: true,
+        is_pos_stock: false,
+      });
+      setWhForm({ name: '' });
+      setShowWhForm(false);
+      await load();
+    } catch {
+      Alert.alert('Erreur', 'Impossible de créer l\'entrepôt (pack Business requis ?).');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveShop = async () => {
+    if (!shop) return;
+    setSaving(true);
+    try {
+      const updated = await updateOnlineShop({
+        enabled: shop.enabled,
+        name: shop.name,
+        description: shop.description,
+        whatsapp: shop.whatsapp,
+        hours: shop.hours,
+        phone: shop.phone,
+        show_prices: shop.show_prices,
+        show_stock: shop.show_stock,
+      });
+      setShop(updated);
+      Alert.alert('OK', 'Boutique en ligne enregistrée.');
     } catch {
       Alert.alert('Erreur', 'Enregistrement impossible.');
     } finally {
@@ -80,116 +111,134 @@ export default function SitesScreen() {
     }
   };
 
-  const count = tab === 'branches' ? branches.length : tab === 'warehouses' ? warehouses.length : locations.length;
-
-  const renderBranch = ({ item }: { item: Branch }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium">{item.name}</Text>
-        <Text variant="bodySmall" style={styles.meta}>
-          {item.phone || '—'} · {item.address || 'Sans adresse'}
-        </Text>
-      </Card.Content>
-    </Card>
-  );
-
-  const renderWarehouse = ({ item }: { item: Warehouse }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium">{item.name}</Text>
-        <Text variant="bodySmall" style={styles.meta}>
-          {item.branch_name} · {item.locations_count} emplacement(s)
-          {item.is_default ? ' · Par défaut' : ''}
-        </Text>
-      </Card.Content>
-    </Card>
-  );
-
-  const renderLocation = ({ item }: { item: WarehouseLocation }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <Text variant="titleMedium">{item.code} — {item.name}</Text>
-        <Text variant="bodySmall" style={styles.meta}>{item.warehouse_name}</Text>
-      </Card.Content>
-    </Card>
-  );
-
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title="Sites" subtitle={`${count} élément(s)`} />
-        <Appbar.Action icon="plus" onPress={() => setShowForm(!showForm)} />
-      </Appbar.Header>
+        <Appbar.Content title="Sites & boutique" subtitle="Siège, POS, entrepôts, boutique en ligne" />
+      </AppHeader>
 
       <SegmentedButtons
+        style={styles.tabs}
         value={tab}
         onValueChange={(v) => setTab(v as Tab)}
-        style={styles.segment}
         buttons={[
-          { value: 'branches', label: 'Magasins' },
+          { value: 'main', label: 'Siège' },
+          { value: 'pos', label: 'POS' },
           { value: 'warehouses', label: 'Entrepôts' },
-          { value: 'locations', label: 'Emplacements' },
+          { value: 'shop', label: 'En ligne' },
         ]}
       />
 
-      {showForm && (
-        <View style={styles.form}>
-          {tab === 'branches' && (
-            <>
-              <TextInput label="Nom" mode="outlined" value={branchForm.name} onChangeText={(v) => setBranchForm({ ...branchForm, name: v })} style={styles.input} />
-              <TextInput label="Téléphone" mode="outlined" value={branchForm.phone} onChangeText={(v) => setBranchForm({ ...branchForm, phone: v })} style={styles.input} />
-              <TextInput label="Adresse" mode="outlined" value={branchForm.address} onChangeText={(v) => setBranchForm({ ...branchForm, address: v })} style={styles.input} />
-            </>
+      {tab === 'main' && (
+        <ScrollView contentContainerStyle={styles.pad} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}>
+          {main ? (
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text variant="titleMedium">{main.name}</Text>
+                <Chip compact style={styles.chip}>Principale</Chip>
+                <Text variant="bodySmall" style={styles.meta}>{main.address || '—'}</Text>
+                <Text variant="bodySmall" style={styles.meta}>{main.phone || '—'}</Text>
+                <Text variant="bodySmall" style={styles.meta}>
+                  Non supprimable. Les commandes web sont préparées ici.
+                </Text>
+              </Card.Content>
+            </Card>
+          ) : (
+            <Text style={styles.empty}>Aucune boutique principale</Text>
           )}
-          {tab === 'warehouses' && (
-            <>
-              <TextInput label="Nom" mode="outlined" value={warehouseForm.name} onChangeText={(v) => setWarehouseForm({ ...warehouseForm, name: v })} style={styles.input} />
-              <Text variant="bodySmall" style={styles.hint}>Boutique ID : {warehouseForm.branch || '—'}</Text>
-            </>
+        </ScrollView>
+      )}
+
+      {tab === 'pos' && (
+        <View style={styles.flex}>
+          <Button mode="contained" style={styles.padH} onPress={() => setShowPosForm(!showPosForm)}>
+            {showPosForm ? 'Fermer' : 'Nouveau point de vente'}
+          </Button>
+          {showPosForm && (
+            <View style={styles.form}>
+              <TextInput label="Nom" mode="outlined" value={posForm.name} onChangeText={(v) => setPosForm({ ...posForm, name: v })} style={styles.input} />
+              <TextInput label="Téléphone" mode="outlined" value={posForm.phone} onChangeText={(v) => setPosForm({ ...posForm, phone: v })} style={styles.input} />
+              <TextInput label="Adresse" mode="outlined" value={posForm.address} onChangeText={(v) => setPosForm({ ...posForm, address: v })} style={styles.input} />
+              <Button mode="contained" loading={saving} onPress={createPos}>Enregistrer</Button>
+            </View>
           )}
-          {tab === 'locations' && (
-            <>
-              <TextInput label="Code" mode="outlined" value={locationForm.code} onChangeText={(v) => setLocationForm({ ...locationForm, code: v })} style={styles.input} />
-              <TextInput label="Nom" mode="outlined" value={locationForm.name} onChangeText={(v) => setLocationForm({ ...locationForm, name: v })} style={styles.input} />
-              <Text variant="bodySmall" style={styles.hint}>Entrepôt ID : {locationForm.warehouse || '—'}</Text>
-            </>
-          )}
-          <Button mode="contained" onPress={handleCreate} loading={saving}>Enregistrer</Button>
+          <FlatList
+            data={posList}
+            keyExtractor={(i) => String(i.id)}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+            contentContainerStyle={styles.pad}
+            renderItem={({ item }) => (
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text variant="titleMedium">{item.name}</Text>
+                  <Text variant="bodySmall" style={styles.meta}>{item.phone || '—'} · {item.address || '—'}</Text>
+                </Card.Content>
+              </Card>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>Aucun point de vente</Text>}
+          />
         </View>
       )}
 
-      <Searchbar placeholder="Rechercher..." value={search} onChangeText={handleSearch} style={styles.search} />
-
-      {tab === 'branches' && (
-        <FlatList
-          data={branches}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={() => load(search.trim() || undefined)} />}
-          contentContainerStyle={styles.list}
-          renderItem={renderBranch}
-          ListEmptyComponent={<Text style={styles.empty}>Aucun magasin</Text>}
-        />
-      )}
       {tab === 'warehouses' && (
-        <FlatList
-          data={warehouses}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={() => load(search.trim() || undefined)} />}
-          contentContainerStyle={styles.list}
-          renderItem={renderWarehouse}
-          ListEmptyComponent={<Text style={styles.empty}>Aucun entrepôt</Text>}
-        />
+        <View style={styles.flex}>
+          <Button mode="contained" style={styles.padH} onPress={() => setShowWhForm(!showWhForm)}>
+            {showWhForm ? 'Fermer' : 'Nouvel entrepôt'}
+          </Button>
+          {showWhForm && (
+            <View style={styles.form}>
+              <TextInput label="Nom entrepôt" mode="outlined" value={whForm.name} onChangeText={(v) => setWhForm({ name: v })} style={styles.input} />
+              <Button mode="contained" loading={saving} onPress={createStorageWh}>Enregistrer</Button>
+            </View>
+          )}
+          <FlatList
+            data={storageWh}
+            keyExtractor={(i) => String(i.id)}
+            refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+            contentContainerStyle={styles.pad}
+            renderItem={({ item }) => (
+              <Card style={styles.card}>
+                <Card.Content>
+                  <Text variant="titleMedium">{item.name}</Text>
+                  <Text variant="bodySmall" style={styles.meta}>Stockage · {item.branch_name}</Text>
+                </Card.Content>
+              </Card>
+            )}
+            ListEmptyComponent={<Text style={styles.empty}>Aucun entrepôt de stockage</Text>}
+          />
+        </View>
       )}
-      {tab === 'locations' && (
-        <FlatList
-          data={locations}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={() => load(search.trim() || undefined)} />}
-          contentContainerStyle={styles.list}
-          renderItem={renderLocation}
-          ListEmptyComponent={<Text style={styles.empty}>Aucun emplacement</Text>}
-        />
+
+      {tab === 'shop' && shop && (
+        <ScrollView contentContainerStyle={styles.pad}>
+          <Text variant="titleSmall">Lien : /shop/{shop.slug}</Text>
+          <Text variant="bodySmall" style={styles.meta}>Court : /s/{shop.code}</Text>
+          <Button mode="outlined" icon="share-variant" style={styles.mt} onPress={() => shareShopLink(shop)}>
+            Partager le lien
+          </Button>
+          <Checkbox.Item
+            label="Boutique activée"
+            status={shop.enabled ? 'checked' : 'unchecked'}
+            onPress={() => setShop({ ...shop, enabled: !shop.enabled })}
+          />
+          <TextInput label="Nom" mode="outlined" value={shop.name} onChangeText={(v) => setShop({ ...shop, name: v })} style={styles.input} />
+          <TextInput label="Description" mode="outlined" value={shop.description} onChangeText={(v) => setShop({ ...shop, description: v })} style={styles.input} />
+          <TextInput label="WhatsApp" mode="outlined" value={shop.whatsapp} onChangeText={(v) => setShop({ ...shop, whatsapp: v })} style={styles.input} />
+          <TextInput label="Horaires" mode="outlined" value={shop.hours} onChangeText={(v) => setShop({ ...shop, hours: v })} style={styles.input} />
+          <Checkbox.Item
+            label="Afficher les prix"
+            status={shop.show_prices ? 'checked' : 'unchecked'}
+            onPress={() => setShop({ ...shop, show_prices: !shop.show_prices })}
+          />
+          <Checkbox.Item
+            label="Afficher le stock"
+            status={shop.show_stock ? 'checked' : 'unchecked'}
+            onPress={() => setShop({ ...shop, show_stock: !shop.show_stock })}
+          />
+          <Text variant="bodySmall" style={styles.meta}>Préparation : {shop.fulfillment_branch_name}</Text>
+          <Button mode="contained" loading={saving} onPress={saveShop}>Enregistrer</Button>
+        </ScrollView>
       )}
     </View>
   );
@@ -197,14 +246,16 @@ export default function SitesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   header: { backgroundColor: colors.surface },
-  segment: { margin: spacing.md, marginBottom: 0 },
-  form: { padding: spacing.md, backgroundColor: colors.surface },
-  input: { marginBottom: spacing.sm },
-  hint: { color: colors.textMuted, marginBottom: spacing.sm },
-  search: { margin: spacing.md },
-  list: { padding: spacing.md, paddingTop: 0 },
+  tabs: { margin: spacing.md },
+  pad: { padding: spacing.md, gap: spacing.sm },
+  padH: { marginHorizontal: spacing.md, marginBottom: spacing.sm },
   card: { marginBottom: spacing.sm },
   meta: { color: colors.textMuted, marginTop: 4 },
-  empty: { textAlign: 'center', color: colors.textMuted, marginTop: 32 },
+  chip: { alignSelf: 'flex-start', marginTop: 6 },
+  empty: { textAlign: 'center', marginTop: 40, color: colors.textMuted },
+  form: { padding: spacing.md, gap: spacing.sm, backgroundColor: colors.surface },
+  input: { marginBottom: spacing.sm },
+  mt: { marginTop: spacing.sm, marginBottom: spacing.sm },
 });

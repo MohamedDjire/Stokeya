@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { fetchProducts } from '../api/auth';
 import { fetchPurchaseOrders, createPurchaseOrder, receivePurchaseOrder } from '../api/purchases';
@@ -69,10 +70,10 @@ export default function PurchasesScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Achats" subtitle="Commandes fournisseurs" />
-      </Appbar.Header>
+      </AppHeader>
 
       <ScrollView contentContainerStyle={styles.content}>
         <Card style={styles.card}>

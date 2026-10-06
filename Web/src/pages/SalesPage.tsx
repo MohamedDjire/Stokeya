@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -23,6 +23,7 @@ import PrintIcon from '@mui/icons-material/PrintOutlined';
 import PageHeader from '../components/PageHeader';
 import { fetchSaleReceipt, fetchSales, PAYMENT_LABELS, type Sale } from '../api/sales';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 const STATUS_LABELS: Record<string, string> = {
   completed: 'Terminée',
@@ -32,6 +33,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function SalesPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [sales, setSales] = useState<Sale[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -56,20 +60,20 @@ export default function SalesPage() {
     }
   };
 
-  const columns: GridColDef<Sale>[] = [
-    { field: 'reference', headerName: 'Référence', width: 140 },
-    { field: 'created_at', headerName: 'Date', width: 130, valueFormatter: (v) => formatDate(v) },
-    { field: 'branch_name', headerName: 'Boutique', width: 130 },
-    { field: 'customer_name', headerName: 'Client', flex: 1, minWidth: 140, valueFormatter: (v) => v || '—' },
-    { field: 'seller_name', headerName: 'Vendeur', width: 130 },
+  const columns: GridColDef<Sale>[] = useMemo(() => [
+    { field: 'reference', headerName: tr('Référence'), width: 140 },
+    { field: 'created_at', headerName: tr('Date'), width: 130, valueFormatter: (v) => formatDate(v) },
+    { field: 'branch_name', headerName: tr('Boutique'), width: 130 },
+    { field: 'customer_name', headerName: tr('Client'), flex: 1, minWidth: 140, valueFormatter: (v) => v || '—' },
+    { field: 'seller_name', headerName: tr('Vendeur'), width: 130 },
     {
-      field: 'total', headerName: 'Total', width: 120,
+      field: 'total', headerName: tr('Total'), width: 120,
       valueFormatter: (v) => formatCurrency(v),
     },
     {
-      field: 'status', headerName: 'Statut', width: 120,
+      field: 'status', headerName: tr('Statut'), width: 120,
       renderCell: (p) => (
-        <Chip size="small" label={STATUS_LABELS[p.value] || p.value}
+        <Chip size="small" label={tr(STATUS_LABELS[p.value] || p.value)}
           color={p.value === 'completed' ? 'success' : p.value === 'cancelled' ? 'error' : 'default'}
           variant="outlined" />
       ),
@@ -77,10 +81,10 @@ export default function SalesPage() {
     {
       field: 'actions', headerName: '', width: 100, sortable: false,
       renderCell: (p) => (
-        <Button size="small" onClick={() => setSelected(p.row)}>Détails</Button>
+        <Button size="small" onClick={() => setSelected(p.row)}>{tr('Détails')}</Button>
       ),
     },
-  ];
+  ], [tr, version]);
 
   return (
     <Box>
@@ -89,10 +93,10 @@ export default function SalesPage() {
         subtitle="Tickets, paiements et détails par caisse"
         action={
           <Stack direction="row" spacing={1}>
-            <TextField size="small" placeholder="Rechercher une référence…" value={search}
+            <TextField size="small" placeholder={tr('Rechercher une référence…')} value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && load()} />
-            <Button variant="outlined" onClick={load}>Rechercher</Button>
+            <Button variant="outlined" onClick={load}>{tr('Rechercher')}</Button>
           </Stack>
         }
       />
@@ -126,17 +130,17 @@ export default function SalesPage() {
             <DialogContent>
               <Stack spacing={2}>
                 <Stack direction="row" spacing={2}>
-                  <Typography variant="body2"><strong>Client :</strong> {selected.customer_name || '—'}</Typography>
-                  <Typography variant="body2"><strong>Vendeur :</strong> {selected.seller_name || '—'}</Typography>
+                  <Typography variant="body2"><strong>{tr('Client')} :</strong> {selected.customer_name || '—'}</Typography>
+                  <Typography variant="body2"><strong>{tr('Vendeur')} :</strong> {selected.seller_name || '—'}</Typography>
                 </Stack>
                 <Divider />
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Produit</TableCell>
-                      <TableCell align="right">Qté</TableCell>
-                      <TableCell align="right">P.U.</TableCell>
-                      <TableCell align="right">Total</TableCell>
+                      <TableCell>{tr('Produit')}</TableCell>
+                      <TableCell align="right">{tr('Qté')}</TableCell>
+                      <TableCell align="right">{tr('P.U.')}</TableCell>
+                      <TableCell align="right">{tr('Total')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -153,38 +157,38 @@ export default function SalesPage() {
                 <Divider />
                 <Stack spacing={0.5}>
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2">Sous-total</Typography>
+                    <Typography variant="body2">{tr('Sous-total')}</Typography>
                     <Typography variant="body2">{formatCurrency(selected.subtotal)}</Typography>
                   </Stack>
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2">TVA</Typography>
+                    <Typography variant="body2">{tr('TVA')}</Typography>
                     <Typography variant="body2">{formatCurrency(selected.tax_amount)}</Typography>
                   </Stack>
                   {Number(selected.discount_amount) > 0 && (
                     <Stack direction="row" justifyContent="space-between">
-                      <Typography variant="body2">Remise</Typography>
+                      <Typography variant="body2">{tr('Remise')}</Typography>
                       <Typography variant="body2" color="error.main">-{formatCurrency(selected.discount_amount)}</Typography>
                     </Stack>
                   )}
                   <Stack direction="row" justifyContent="space-between">
-                    <Typography fontWeight={700}>Total</Typography>
+                    <Typography fontWeight={700}>{tr('Total')}</Typography>
                     <Typography fontWeight={700} color="primary.main">{formatCurrency(selected.total)}</Typography>
                   </Stack>
                 </Stack>
                 {selected.payments.length > 0 && (
                   <>
                     <Divider />
-                    <Typography variant="subtitle2">Paiements</Typography>
+                    <Typography variant="subtitle2">{tr('Paiements')}</Typography>
                     {selected.payments.map((p, i) => (
                       <Stack key={i} direction="row" justifyContent="space-between">
-                        <Typography variant="body2">{PAYMENT_LABELS[p.method] || p.method}</Typography>
+                        <Typography variant="body2">{tr(PAYMENT_LABELS[p.method] || p.method)}</Typography>
                         <Typography variant="body2">{formatCurrency(p.amount)}</Typography>
                       </Stack>
                     ))}
                   </>
                 )}
                 <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => printReceipt(selected.id)}>
-                  Imprimer le ticket
+                  {tr('Imprimer le ticket')}
                 </Button>
               </Stack>
             </DialogContent>

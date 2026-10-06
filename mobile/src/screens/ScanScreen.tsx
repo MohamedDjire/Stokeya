@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Text, TextInput } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { fetchProductByBarcode } from '../api/products';
 import type { Product } from '../api/auth';
@@ -41,11 +42,11 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Scan code-barres" subtitle="Recherche produit" />
         <Appbar.Action icon="barcode-scan" onPress={() => setShowScanner(true)} />
-      </Appbar.Header>
+      </AppHeader>
 
       <ScrollView contentContainerStyle={styles.content}>
         <TextInput

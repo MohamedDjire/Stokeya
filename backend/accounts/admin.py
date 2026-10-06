@@ -8,7 +8,7 @@ class UserAdmin(BaseUserAdmin):
     list_display = ['username', 'email', 'company', 'is_company_admin', 'is_active']
     list_filter = ['is_active', 'is_company_admin', 'company']
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('Inventra', {'fields': ('phone', 'company', 'is_company_admin')}),
+        ('Stokeya', {'fields': ('phone', 'company', 'is_company_admin')}),
     )
 
 

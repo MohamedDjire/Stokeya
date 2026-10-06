@@ -1,4 +1,4 @@
-# Inventra — Schéma de Base de Données
+# Stokeya — Schéma de Base de Données
 
 ## Diagramme relationnel (simplifié)
 

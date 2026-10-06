@@ -6,6 +6,8 @@ class PaymentProvider(models.TextChoices):
     WAVE = 'wave', 'Wave'
     ORANGE_MONEY = 'orange_money', 'Orange Money'
     MTN_MONEY = 'mtn_money', 'MTN Money'
+    PAYPAL = 'paypal', 'PayPal'
+    SASPAY = 'saspay', 'SasPay'
 
 
 class CheckoutStatus(models.TextChoices):
@@ -75,6 +77,7 @@ class SubscriptionWaveCheckout(TimeStampedModel):
         'companies.SubscriptionPlan', on_delete=models.PROTECT, related_name='wave_checkouts'
     )
     billing_cycle = models.CharField(max_length=10, default='monthly')
+    months = models.PositiveSmallIntegerField(default=1)
     provider = models.CharField(
         max_length=20,
         choices=PaymentProvider.choices,

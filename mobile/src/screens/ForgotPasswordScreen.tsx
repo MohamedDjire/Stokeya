@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput, HelperText } from 'react-native-paper';
+import StokeyaLogo from '../components/StokeyaLogo';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { requestPasswordReset } from '../api/auth';
 import { getApiErrorMessage } from '../api/errors';
@@ -35,6 +36,9 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.logoWrap}>
+          <StokeyaLogo size={48} />
+        </View>
         <Text variant="headlineSmall" style={styles.title}>Mot de passe oublié</Text>
         <Text variant="bodyMedium" style={styles.sub}>
           Entrez votre email pour réinitialiser votre mot de passe.
@@ -60,6 +64,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg },
+  logoWrap: { alignItems: 'center', marginBottom: spacing.lg },
   title: { fontWeight: '700', color: colors.primary, marginBottom: spacing.sm },
   sub: { color: colors.textMuted, marginBottom: spacing.lg },
   input: { marginBottom: spacing.sm },

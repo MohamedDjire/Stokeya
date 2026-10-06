@@ -20,10 +20,15 @@ import {
   type Supplier,
 } from '../api/suppliers';
 import { getApiErrorMessage } from '../api/client';
+import { formatNumber } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 const empty = { name: '', phone: '', email: '', address: '', contact_name: '' };
 
 export default function SuppliersPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [rows, setRows] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -48,7 +53,7 @@ export default function SuppliersPage() {
   };
 
   const save = async () => {
-    if (!form.name) { setError('Le nom est obligatoire.'); return; }
+    if (!form.name) { setError(tr('Le nom est obligatoire.')); return; }
     setSaving(true);
     try {
       if (editing) await updateSupplier(editing.id, form);
@@ -63,16 +68,16 @@ export default function SuppliersPage() {
   };
 
   const columns: GridColDef<Supplier>[] = [
-    { field: 'name', headerName: 'Nom', flex: 1, minWidth: 180 },
-    { field: 'contact_name', headerName: 'Contact', width: 150, valueGetter: (v) => v || '—' },
-    { field: 'phone', headerName: 'Téléphone', width: 150 },
-    { field: 'orders_count', headerName: 'Commandes', width: 120, valueGetter: (v) => v ?? 0 },
+    { field: 'name', headerName: tr('Nom'), flex: 1, minWidth: 180 },
+    { field: 'contact_name', headerName: tr('Contact'), width: 150, valueGetter: (v) => v || '—' },
+    { field: 'phone', headerName: tr('Téléphone'), width: 150 },
+    { field: 'orders_count', headerName: tr('Commandes'), width: 120, valueGetter: (v) => v ?? 0, valueFormatter: (v) => formatNumber(v) },
   ];
 
   return (
     <Box>
-      <PageHeader title="Fournisseurs" subtitle={`${rows.length} fournisseur(s)`}
-        action={<Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>Nouveau fournisseur</Button>} />
+      <PageHeader title={tr('Fournisseurs')} subtitle={tr(`${rows.length} fournisseur(s)`)}
+        action={<Button variant="contained" startIcon={<AddIcon />} onClick={openNew}>{tr('Nouveau fournisseur')}</Button>} />
 
       <Box sx={{ height: 560, bgcolor: 'background.paper', borderRadius: 2 }}>
         <DataGrid rows={rows} columns={columns} loading={loading} disableRowSelectionOnClick
@@ -82,20 +87,20 @@ export default function SuppliersPage() {
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>{editing ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}</DialogTitle>
+        <DialogTitle>{editing ? tr('Modifier le fournisseur') : tr('Nouveau fournisseur')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
-            <TextField label="Nom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} fullWidth required />
-            <TextField label="Personne de contact" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} fullWidth />
-            <TextField label="Téléphone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} fullWidth />
-            <TextField label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth />
-            <TextField label="Adresse" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} fullWidth multiline rows={2} />
+            <TextField label={tr('Nom')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} fullWidth required />
+            <TextField label={tr('Personne de contact')} value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} fullWidth />
+            <TextField label={tr('Téléphone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} fullWidth />
+            <TextField label={tr('Email')} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth />
+            <TextField label={tr('Adresse')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} fullWidth multiline rows={2} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpen(false)}>Annuler</Button>
-          <Button variant="contained" onClick={save} disabled={saving}>Enregistrer</Button>
+          <Button onClick={() => setOpen(false)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={save} disabled={saving}>{tr('Enregistrer')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

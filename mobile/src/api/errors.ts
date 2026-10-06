@@ -14,7 +14,11 @@ export function getApiErrorMessage(
 
     const data = err.response.data;
     if (typeof data === 'string' && data.trim()) {
-      return data;
+      const trimmed = data.trim();
+      if (/^<!DOCTYPE|<html/i.test(trimmed) || trimmed.includes('<title>')) {
+        return fallback;
+      }
+      return trimmed.length > 280 ? fallback : trimmed;
     }
     if (data && typeof data === 'object') {
       const parts = Object.values(data as Record<string, unknown>).flatMap((value) => {

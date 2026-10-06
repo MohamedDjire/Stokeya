@@ -1,32 +1,24 @@
 {
   "expo": {
-    "name": "Inventra",
-    "slug": "inventra",
+    "name": "Stokeya",
+    "slug": "stokeya",
     "version": "1.0.0",
-    "scheme": "inventra",
+    "scheme": "stokeya",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.inventra.app",
+      "bundleIdentifier": "com.stokeya.app",
       "buildNumber": "1.0.0"
     },
     "android": {
-      "package": "com.inventra.app",
+      "package": "com.stokeya.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0B1F3A"
       },
-      "usesCleartextTraffic": false,
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -37,15 +29,24 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Autoriser Inventra à utiliser la caméra pour scanner les codes-barres."
+          "cameraPermission": "Autoriser Stokeya à utiliser la caméra pour scanner les codes-barres."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Autoriser Inventra à accéder à vos photos pour ajouter une image de produit."
+          "photosPermission": "Autoriser Stokeya à accéder à vos photos pour ajouter une image de produit."
         }
-      ]
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0B1F3A"
+        }
+      ],
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

@@ -5,6 +5,7 @@ from common.models import TimeStampedModel
 
 class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
+    avatar = models.ImageField(upload_to='users/avatars/', blank=True, null=True)
     company = models.ForeignKey(
         'companies.Company',
         on_delete=models.CASCADE,
@@ -13,6 +14,33 @@ class User(AbstractUser):
         blank=True,
     )
     is_company_admin = models.BooleanField(default=False)
+    # Périmètre opérationnel
+    assigned_branch = models.ForeignKey(
+        'branches.Branch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_users',
+        help_text='Point de vente rattaché (caissier / responsable PDV)',
+    )
+    assigned_warehouse = models.ForeignKey(
+        'warehouses.Warehouse',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_users',
+        help_text='Entrepôt rattaché (responsable / magasinier)',
+    )
+    assigned_cash_register = models.ForeignKey(
+        'branches.CashRegister',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_users',
+        help_text='Caisse rattachée (caissier)',
+    )
+    # Surcharges d'autorisations (True/False) par rapport au rôle
+    permission_flags = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ['first_name', 'last_name']
@@ -26,8 +54,10 @@ class Role(TimeStampedModel):
         ('super_admin', 'Super Administrateur'),
         ('company_admin', 'Administrateur entreprise'),
         ('manager', 'Gérant'),
-        ('cashier', 'Caissier'),
+        ('warehouse_manager', 'Responsable entrepôt'),
         ('stock_keeper', 'Magasinier'),
+        ('pos_manager', 'Responsable point de vente'),
+        ('cashier', 'Caissier'),
         ('accountant', 'Comptable'),
     ]
 

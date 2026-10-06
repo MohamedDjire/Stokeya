@@ -30,10 +30,14 @@ import { fetchProducts, type Product } from '../api/auth';
 import { fetchWarehouses, type WarehouseItem } from '../api/stock';
 import { getApiErrorMessage } from '../api/client';
 import { formatCurrency, formatDate } from '../utils/format';
+import { useLocale } from '../locale/useLocale';
 
 interface Line { product_id: number | ''; quantity: string; unit_price: string; }
 
 export default function PurchasesPage() {
+  const { tr, version } = useLocale();
+  void version;
+
   const [rows, setRows] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -69,7 +73,7 @@ export default function PurchasesPage() {
   const createOrder = async () => {
     setError(null);
     const valid = lines.filter((l) => l.product_id && l.quantity);
-    if (!supplier || valid.length === 0) { setError('Choisissez un fournisseur et au moins un produit.'); return; }
+    if (!supplier || valid.length === 0) { setError(tr('Choisissez un fournisseur et au moins un produit.')); return; }
     setSaving(true);
     try {
       await createPurchaseOrder({
@@ -105,27 +109,27 @@ export default function PurchasesPage() {
   };
 
   const columns: GridColDef<PurchaseOrder>[] = [
-    { field: 'reference', headerName: 'Référence', width: 150 },
-    { field: 'supplier_name', headerName: 'Fournisseur', flex: 1, minWidth: 160 },
-    { field: 'created_at', headerName: 'Date', width: 120, valueFormatter: (v) => formatDate(v) },
-    { field: 'total', headerName: 'Total', width: 140, valueFormatter: (v) => formatCurrency(v) },
+    { field: 'reference', headerName: tr('Référence'), width: 150 },
+    { field: 'supplier_name', headerName: tr('Fournisseur'), flex: 1, minWidth: 160 },
+    { field: 'created_at', headerName: tr('Date'), width: 120, valueFormatter: (v) => formatDate(v) },
+    { field: 'total', headerName: tr('Total'), width: 140, valueFormatter: (v) => formatCurrency(v) },
     {
-      field: 'status', headerName: 'Statut', width: 130,
+      field: 'status', headerName: tr('Statut'), width: 130,
       renderCell: (p) => <Chip size="small" label={p.value} variant="outlined"
         color={p.value === 'received' ? 'success' : p.value === 'cancelled' ? 'error' : 'warning'} />,
     },
     {
       field: 'actions', headerName: '', width: 130, sortable: false,
       renderCell: (p) => p.row.status !== 'received' ? (
-        <Button size="small" onClick={(e) => { e.stopPropagation(); setReceiveOrder(p.row); }}>Réceptionner</Button>
+        <Button size="small" onClick={(e) => { e.stopPropagation(); setReceiveOrder(p.row); }}>{tr('Réceptionner')}</Button>
       ) : null,
     },
   ];
 
   return (
     <Box>
-      <PageHeader title="Achats" subtitle={`${rows.length} commande(s)`}
-        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setError(null); setOpen(true); }}>Nouvelle commande</Button>} />
+      <PageHeader title={tr('Achats')} subtitle={tr(`${rows.length} commande(s)`)}
+        action={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setError(null); setOpen(true); }}>{tr('Nouvelle commande')}</Button>} />
 
       <Box sx={{ height: 560, bgcolor: 'background.paper', borderRadius: 2 }}>
         <DataGrid rows={rows} columns={columns} loading={loading} disableRowSelectionOnClick
@@ -133,56 +137,56 @@ export default function PurchasesPage() {
       </Box>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Nouvelle commande d'achat</DialogTitle>
+        <DialogTitle>{tr('Nouvelle commande d\'achat')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
-            <TextField select label="Fournisseur" value={supplier}
+            <TextField select label={tr('Fournisseur')} value={supplier}
               onChange={(e) => setSupplier(Number(e.target.value))} fullWidth>
               {suppliers.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
             </TextField>
-            <Divider>Articles</Divider>
+            <Divider>{tr('Articles')}</Divider>
             {lines.map((l, i) => (
               <Stack key={i} direction="row" spacing={1} alignItems="center">
-                <TextField select label="Produit" value={l.product_id}
+                <TextField select label={tr('Produit')} value={l.product_id}
                   onChange={(e) => setLine(i, 'product_id', e.target.value)} sx={{ flex: 2 }} size="small">
                   {products.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                 </TextField>
-                <TextField label="Qté" type="number" value={l.quantity}
+                <TextField label={tr('Qté')} type="number" value={l.quantity}
                   onChange={(e) => setLine(i, 'quantity', e.target.value)} sx={{ flex: 1 }} size="small" />
-                <TextField label="P.U." type="number" value={l.unit_price}
+                <TextField label={tr('P.U.')} type="number" value={l.unit_price}
                   onChange={(e) => setLine(i, 'unit_price', e.target.value)} sx={{ flex: 1 }} size="small" />
                 <IconButton size="small" color="error" onClick={() => removeLine(i)}><DeleteIcon fontSize="small" /></IconButton>
               </Stack>
             ))}
             <Button startIcon={<AddIcon />} onClick={addLine} size="small" sx={{ alignSelf: 'flex-start' }}>
-              Ajouter un article
+              {tr('Ajouter un article')}
             </Button>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setOpen(false)}>Annuler</Button>
-          <Button variant="contained" onClick={createOrder} disabled={saving}>Créer</Button>
+          <Button onClick={() => setOpen(false)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={createOrder} disabled={saving}>{tr('Créer')}</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!receiveOrder} onClose={() => setReceiveOrder(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Réceptionner la commande</DialogTitle>
+        <DialogTitle>{tr('Réceptionner la commande')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              {receiveOrder?.reference} — {receiveOrder?.items.length} article(s)
+              {receiveOrder?.reference} — {receiveOrder?.items.length} {tr('article(s)')}
             </Typography>
-            <TextField select label="Entrepôt de réception" value={warehouse}
+            <TextField select label={tr('Entrepôt de réception')} value={warehouse}
               onChange={(e) => setWarehouse(Number(e.target.value))} fullWidth>
               {warehouses.map((w) => <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>)}
             </TextField>
-            <Alert severity="info">La totalité des quantités commandées sera ajoutée au stock.</Alert>
+            <Alert severity="info">{tr('La totalité des quantités commandées sera ajoutée au stock.')}</Alert>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setReceiveOrder(null)}>Annuler</Button>
-          <Button variant="contained" onClick={doReceive} disabled={saving}>Confirmer la réception</Button>
+          <Button onClick={() => setReceiveOrder(null)}>{tr('Annuler')}</Button>
+          <Button variant="contained" onClick={doReceive} disabled={saving}>{tr('Confirmer la réception')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

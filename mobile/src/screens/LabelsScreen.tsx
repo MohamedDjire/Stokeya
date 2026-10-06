@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Share, StyleSheet, View } from 'react-native';
 import { Appbar, Button, Card, Checkbox, Searchbar, Text } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { fetchProducts, type Product } from '../api/auth';
 import { colors, spacing } from '../theme/colors';
@@ -66,10 +67,10 @@ export default function LabelsScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Étiquettes" subtitle={`${selected.size} sélectionné(s)`} />
-      </Appbar.Header>
+      </AppHeader>
 
       <Searchbar placeholder="Filtrer produits..." value={search} onChangeText={setSearch} style={styles.search} />
 

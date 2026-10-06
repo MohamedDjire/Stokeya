@@ -5,9 +5,12 @@ export interface Company {
   name: string;
   slug: string;
   logo: string | null;
+  slogan?: string;
   email: string;
   phone: string;
   address: string;
+  website?: string;
+  tax_id?: string;
   country: string;
   currency: string;
   tax_rate: string;

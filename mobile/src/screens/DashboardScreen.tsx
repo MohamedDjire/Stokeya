@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dimensions, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Card, Text, ActivityIndicator, IconButton, Button, Chip, SegmentedButtons } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,7 +9,9 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { useAppSelector } from '../store/hooks';
 import { fetchDashboard, type DashboardData } from '../api/auth';
+import { cachePeek } from '../api/cache';
 import { hasModuleAccess } from '../utils/permissions';
+import { StokeyaGlyph } from '../components/StokeyaLogo';
 import StatCard from '../components/StatCard';
 import ModuleCard from '../components/ModuleCard';
 import { colors, spacing } from '../theme/colors';
@@ -24,8 +27,8 @@ type ChartTab = 'stock' | 'purchases' | 'sales' | 'margin';
 export default function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAppSelector((s) => s.auth);
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(() => cachePeek<DashboardData>('dashboard') ?? null);
+  const [loading, setLoading] = useState(() => !cachePeek('dashboard'));
   const [refreshing, setRefreshing] = useState(false);
   const [chartTab, setChartTab] = useState<ChartTab>('stock');
 
@@ -61,14 +64,17 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
+        <View style={styles.headerBrand}>
+          <StokeyaGlyph size={32} />
+        </View>
         <Appbar.Content
-          title="Inventra"
+          title="Stokeya"
           titleStyle={styles.headerTitle}
           subtitle={user?.full_name || user?.email}
         />
-        <IconButton icon="account-circle-outline" size={28} onPress={() => navigation.navigate('Profile')} />
-      </Appbar.Header>
+        <IconButton icon="account-circle-outline" size={28} iconColor={colors.secondary} onPress={() => navigation.navigate('Profile')} />
+      </AppHeader>
 
       {loading ? (
         <ActivityIndicator style={styles.loader} size="large" color={colors.primary} />
@@ -79,12 +85,22 @@ export default function DashboardScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />
           }
         >
-          <Text variant="headlineSmall" style={styles.greeting}>
-            Bonjour {user?.first_name || ''}
-          </Text>
-          <Text variant="bodyMedium" style={styles.subGreeting}>
-            Tableau de bord — stock, ventes, achats et alertes
-          </Text>
+          <View style={styles.hero}>
+            <Text variant="headlineSmall" style={styles.greeting}>
+              Bonjour {user?.first_name || ''}
+            </Text>
+            <Text variant="bodyMedium" style={styles.subGreeting}>
+              Stock, ventes et caisse — tout sous la main
+            </Text>
+            <View style={styles.heroActions}>
+              <Button mode="contained" icon="plus" buttonColor="#fff" textColor={colors.secondary} onPress={() => navigation.navigate('Stock')}>
+                Ajouter du stock
+              </Button>
+              <Button mode="outlined" icon="cash-register" textColor="#fff" onPress={() => navigation.navigate('Caisse')}>
+                Caisse
+              </Button>
+            </View>
+          </View>
 
           <View style={styles.statsGrid}>
             <StatCard title="CA aujourd'hui" value={formatCurrency(data?.revenue_today)} icon="cash" />
@@ -123,11 +139,11 @@ export default function DashboardScreen() {
                 {[
                   { label: 'Valeur', value: formatCurrency(overview?.stock_value) },
                   { label: 'Qté', value: Number(overview?.stock_qty || 0).toLocaleString('fr-FR') },
+                  { label: 'Inventaires', value: overview?.inventories ?? 0 },
                   { label: 'Âge (j)', value: overview?.stock_age_avg ?? 0 },
                   { label: 'Rotation', value: overview?.rotation ?? 0 },
                   { label: 'Boutiques', value: overview?.branches ?? 0 },
                   { label: 'Entrepôts', value: overview?.warehouses ?? 0 },
-                  { label: 'Inventaires', value: overview?.inventories ?? 0 },
                   { label: 'Ruptures', value: overview?.out_of_stock ?? 0 },
                 ].map((item) => (
                   <View key={item.label} style={styles.overviewItem}>
@@ -196,7 +212,7 @@ export default function DashboardScreen() {
                     backgroundGradientFrom: colors.surface,
                     backgroundGradientTo: colors.surface,
                     decimalPlaces: 0,
-                    color: (o = 1) => `rgba(21, 101, 192, ${o})`,
+                    color: (o = 1) => `rgba(13, 148, 136, ${o})`,
                     labelColor: () => colors.textMuted,
                     propsForDots: { r: '2', strokeWidth: '1', stroke: colors.primary },
                     propsForBackgroundLines: { stroke: colors.border },
@@ -237,7 +253,7 @@ export default function DashboardScreen() {
             <ModuleCard title="Produits" subtitle="Catalogue et prix" icon="package-variant" color={colors.secondary} onPress={() => navigation.navigate('Produits')} />
           )}
           {hasModuleAccess(user?.permissions, 'stock') && (
-            <ModuleCard title="Stock" subtitle="Entrées, sorties, inventaire" icon="warehouse" color={colors.accent} onPress={() => navigation.navigate('Stock')} />
+            <ModuleCard title="Stock" subtitle="Ajouter, suivre, inventaire" icon="warehouse" color={colors.accent} onPress={() => navigation.navigate('Stock')} />
           )}
           {hasModuleAccess(user?.permissions, 'stock') && (
             <>
@@ -246,10 +262,13 @@ export default function DashboardScreen() {
               <ModuleCard title="Scan" subtitle="Recherche par code-barres" icon="barcode-scan" color="#283593" onPress={() => navigation.navigate('Scan')} />
               <ModuleCard title="Étiquettes" subtitle="Aperçu et partage d'étiquettes" icon="label" color="#AD1457" onPress={() => navigation.navigate('Labels')} />
               <ModuleCard title="Traçabilité" subtitle="Lots et mouvements produit" icon="timeline-text" color="#4527A0" onPress={() => navigation.navigate('Traceability')} />
-              <ModuleCard title="Requêtes stock" subtitle="Demandes inter-entrepôts" icon="swap-horizontal" color="#1565C0" onPress={() => navigation.navigate('StockRequests')} />
+              <ModuleCard title="Requêtes stock" subtitle="Demandes inter-entrepôts" icon="swap-horizontal" color="#0D9488" onPress={() => navigation.navigate('StockRequests')} />
             </>
           )}
-          <ModuleCard title="Clients" subtitle="CRM et fidélité" icon="account-group" color="#5E35B1" onPress={() => navigation.navigate('Customers')} />
+          {hasModuleAccess(user?.permissions, 'sales') && (
+            <ModuleCard title="Commandes" subtitle="Commandes reçues de vos boutiques en ligne" icon="cart-check" color="#00838F" onPress={() => navigation.navigate('ShopOrders')} />
+          )}
+          <ModuleCard title="CRM Clients" subtitle="Fiche 360°, fidélité et segments" icon="account-group" color="#5E35B1" onPress={() => navigation.navigate('Customers')} />
           <ModuleCard title="Fournisseurs" subtitle="Gestion fournisseurs" icon="truck-delivery" color="#455A64" onPress={() => navigation.navigate('Suppliers')} />
           <ModuleCard title="Achats" subtitle="Commandes et réceptions" icon="cart-arrow-down" color="#6D4C41" onPress={() => navigation.navigate('Purchases')} />
           <ModuleCard title="Dépenses" subtitle="Charges et frais" icon="cash-minus" color={colors.error} onPress={() => navigation.navigate('Expenses')} />
@@ -264,24 +283,34 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { backgroundColor: colors.surface },
-  headerTitle: { fontWeight: '700', color: colors.primary },
+  headerBrand: { marginLeft: 8, marginRight: 4 },
+  headerTitle: { fontWeight: '800', color: colors.secondary },
+  hero: {
+    backgroundColor: colors.secondary,
+    borderRadius: 20,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   loader: { marginTop: 48 },
-  greeting: { fontWeight: '700', color: colors.text },
-  subGreeting: { color: colors.textMuted, marginBottom: spacing.md },
+  greeting: { fontWeight: '800', color: '#fff' },
+  subGreeting: { color: 'rgba(255,255,255,0.88)', marginBottom: spacing.sm },
+  heroActions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
+  overviewCard: { marginBottom: spacing.md, backgroundColor: '#F0FDFA' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   rowCards: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   halfCard: { flex: 1, backgroundColor: colors.surface },
   cardTitle: { fontWeight: '700', marginBottom: 6, color: colors.primary },
   chip: { alignSelf: 'flex-start', marginTop: 8 },
-  overviewCard: { marginBottom: spacing.md, backgroundColor: '#EEF5FF' },
   overviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   overviewItem: {
     width: '22%',
-    minWidth: 70,
+    minWidth: 64,
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderRadius: 8,
-    padding: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
   overviewValue: { fontWeight: '800', color: colors.primary, textAlign: 'center' },

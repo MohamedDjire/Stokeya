@@ -1,6 +1,6 @@
-# Inventra — Application Web
+# Stokeya — Application Web
 
-Version web (React) d'Inventra, connectée au même backend Django que l'application mobile.
+Version web (React) d'Stokeya, connectée au même backend Django que l'application mobile.
 Mêmes fonctionnalités, architecture adaptée au desktop (sidebar, tableaux, graphiques).
 
 ## Stack

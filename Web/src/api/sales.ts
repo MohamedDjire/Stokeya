@@ -47,7 +47,13 @@ export async function syncOfflineSales(sales: CheckoutPayload[]) {
   return data as {
     synced: number;
     total: number;
-    results: Array<{ client_reference: string; ok: boolean; detail?: unknown; sale?: Sale }>;
+    results: Array<{
+      client_reference: string;
+      ok: boolean;
+      detail?: unknown;
+      retry?: boolean;
+      sale?: Sale;
+    }>;
   };
 }
 

@@ -4,9 +4,16 @@ import { getAccessToken } from '../api/client';
 import { getApiErrorMessage } from '../api/errors';
 import type { User } from '../api/auth';
 
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import * as authApi from '../api/auth';
+import { getAccessToken } from '../api/client';
+import { getApiErrorMessage } from '../api/errors';
+import type { User } from '../api/auth';
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isBootstrapping: boolean;
   isLoading: boolean;
   error: string | null;
 }
@@ -14,14 +21,35 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: true,
+  isBootstrapping: true,
+  isLoading: false,
   error: null,
 };
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async () => {
-  const token = await getAccessToken();
+  const token = await withTimeout(getAccessToken(), 2500).catch(() => null);
   if (!token) return null;
-  return authApi.fetchMe();
+  try {
+    return await withTimeout(authApi.fetchMe(), 5000);
+  } catch {
+    return null;
+  }
 });
 
 export const login = createAsyncThunk(
@@ -54,15 +82,15 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(bootstrapAuth.pending, (state) => {
-        state.isLoading = true;
+        state.isBootstrapping = true;
       })
       .addCase(bootstrapAuth.fulfilled, (state, action: PayloadAction<User | null>) => {
-        state.isLoading = false;
+        state.isBootstrapping = false;
         state.user = action.payload;
         state.isAuthenticated = !!action.payload;
       })
       .addCase(bootstrapAuth.rejected, (state) => {
-        state.isLoading = false;
+        state.isBootstrapping = false;
         state.isAuthenticated = false;
         state.user = null;
       })
@@ -77,6 +105,7 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
+        state.isAuthenticated = false;
         state.error = action.payload as string;
       })
       .addCase(logout.fulfilled, (state) => {

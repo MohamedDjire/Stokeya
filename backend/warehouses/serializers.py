@@ -11,8 +11,9 @@ class WarehouseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Warehouse
         fields = [
-            'id', 'branch', 'branch_name', 'name', 'is_default', 'is_active',
-            'locations_count', 'created_at',
+            'id', 'branch', 'branch_name', 'name', 'code', 'manager_name', 'phone',
+            'address', 'city', 'description', 'is_default', 'is_active',
+            'is_pos_stock', 'locations_count', 'created_at',
         ]
 
     def get_locations_count(self, obj):

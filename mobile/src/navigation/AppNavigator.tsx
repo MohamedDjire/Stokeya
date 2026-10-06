@@ -17,23 +17,22 @@ import ScanScreen from '../screens/ScanScreen';
 import LabelsScreen from '../screens/LabelsScreen';
 import TraceabilityScreen from '../screens/TraceabilityScreen';
 import StockRequestsScreen from '../screens/StockRequestsScreen';
-import { colors } from '../theme/colors';
+import ShopOrdersScreen from '../screens/ShopOrdersScreen';
+import { nativeHeaderOptions } from '../components/AppHeader';
 import type { AppStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
-
-const modalHeader = { headerStyle: { backgroundColor: colors.surface } };
 
 export default function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       <Stack.Screen name="ProductCreate" component={ProductCreateScreen}
-        options={{ presentation: 'modal', headerShown: true, title: 'Nouveau produit', ...modalHeader }} />
+        options={{ presentation: 'modal', headerShown: true, title: 'Nouveau produit', ...nativeHeaderOptions }} />
       <Stack.Screen name="ProductEdit" component={ProductEditScreen}
-        options={{ headerShown: true, title: 'Modifier produit', ...modalHeader }} />
+        options={{ headerShown: true, title: 'Modifier produit', ...nativeHeaderOptions }} />
       <Stack.Screen name="ProductImport" component={ProductImportScreen}
-        options={{ headerShown: true, title: 'Importer des produits', ...modalHeader }} />
+        options={{ headerShown: true, title: 'Importer des produits', ...nativeHeaderOptions }} />
       <Stack.Screen name="Customers" component={CustomersScreen}
         options={{ headerShown: false }} />
       <Stack.Screen name="Suppliers" component={SuppliersScreen}
@@ -61,6 +60,8 @@ export default function AppNavigator() {
       <Stack.Screen name="Traceability" component={TraceabilityScreen}
         options={{ headerShown: false }} />
       <Stack.Screen name="StockRequests" component={StockRequestsScreen}
+        options={{ headerShown: false }} />
+      <Stack.Screen name="ShopOrders" component={ShopOrdersScreen}
         options={{ headerShown: false }} />
     </Stack.Navigator>
   );

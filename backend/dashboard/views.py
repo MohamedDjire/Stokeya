@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Max, Sum
+from django.db.models import Count, Max, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
@@ -12,6 +12,7 @@ from branches.models import Branch
 from common.permissions import IsCompanyMember
 from customers.models import Customer
 from inventory.models import MovementType, StockAdjustment, StockLevel, StockMovement
+from inventory.services import average_positive_quantity, classify_stock
 from products.models import Product
 from purchases.models import OrderStatus, PurchaseOrder
 from sales.models import PaymentStatus, Sale, SaleStatus
@@ -48,7 +49,7 @@ def build_dashboard(company):
     levels = list(
         StockLevel.objects.filter(
             product__company=company, product__is_active=True,
-        ).select_related('product', 'warehouse')
+        ).select_related('product', 'warehouse', 'warehouse__branch')
     )
 
     stock_value = Decimal('0')
@@ -59,51 +60,40 @@ def build_dashboard(company):
     negative_stock = 0
     over_max = 0
     low_stock_products = []
+    out_of_stock_products = []
     negative_products = []
     restock_products = []
+    avg_qty = average_positive_quantity([level.quantity for level in levels])
 
     for level in levels:
         product = level.product
         qty = level.quantity
         stock_qty += qty
         stock_value += qty * (product.purchase_price or Decimal('0'))
+        status = classify_stock(qty, product.min_stock, avg_qty)
+        item = {
+            'id': product.id,
+            'name': product.name,
+            'quantity': qty,
+            'min_stock': product.min_stock,
+            'warehouse': level.warehouse.name,
+            'status': status,
+        }
 
         if qty < 0:
             negative_stock += 1
-            negative_products.append({
-                'id': product.id,
-                'name': product.name,
-                'quantity': qty,
-                'min_stock': product.min_stock,
-                'warehouse': level.warehouse.name,
-            })
-        elif qty <= 0:
+            negative_products.append(item)
+            restock_products.append(item)
+        elif status == 'out_of_stock':
             out_of_stock += 1
-            restock_products.append({
-                'id': product.id,
-                'name': product.name,
-                'quantity': qty,
-                'min_stock': product.min_stock,
-                'warehouse': level.warehouse.name,
-            })
+            out_of_stock_products.append(item)
+            restock_products.append(item)
         else:
             in_stock += 1
-            if qty <= product.min_stock:
+            if status == 'low':
                 low_stock += 1
-                low_stock_products.append({
-                    'id': product.id,
-                    'name': product.name,
-                    'quantity': qty,
-                    'min_stock': product.min_stock,
-                    'warehouse': level.warehouse.name,
-                })
-                restock_products.append({
-                    'id': product.id,
-                    'name': product.name,
-                    'quantity': qty,
-                    'min_stock': product.min_stock,
-                    'warehouse': level.warehouse.name,
-                })
+                low_stock_products.append(item)
+                restock_products.append(item)
 
         if product.max_stock and qty > product.max_stock:
             over_max += 1
@@ -274,6 +264,7 @@ def build_dashboard(company):
             'to_restock': restock_products[:10],
             'negative': negative_products[:10],
             'low_stock': low_stock_products[:10],
+            'out_of_stock': out_of_stock_products[:10],
         },
 
         'charts': {
@@ -284,7 +275,76 @@ def build_dashboard(company):
             'sales': sales_series,
             'margin': margin_series,
         },
+
+        'sites_overview': _build_sites_overview(company, levels),
     }
+
+
+def _build_sites_overview(company, levels):
+    """Vue multi-sites : stock + demandes par boutique / entrepôt."""
+    from inventory.models import RequestStatus, StockRequest
+
+    pending_statuses = [
+        RequestStatus.PENDING,
+        RequestStatus.POS_VALIDATED,
+        RequestStatus.APPROVED,
+    ]
+    request_counts = {
+        r['to_warehouse_id']: r['c']
+        for r in StockRequest.objects.filter(
+            company=company, status__in=pending_statuses,
+        ).values('to_warehouse_id').annotate(c=Count('id'))
+    }
+
+    # Agrégat stock par warehouse
+    by_wh = {}
+    for level in levels:
+        wid = level.warehouse_id
+        if wid not in by_wh:
+            by_wh[wid] = {
+                'warehouse_id': wid,
+                'warehouse_name': level.warehouse.name,
+                'branch_id': level.warehouse.branch_id,
+                'branch_name': level.warehouse.branch.name,
+                'is_pos_stock': level.warehouse.is_pos_stock,
+                'is_main': level.warehouse.branch.is_main,
+                'stock_qty': Decimal('0'),
+                'stock_value': Decimal('0'),
+            }
+        qty = level.quantity or Decimal('0')
+        by_wh[wid]['stock_qty'] += qty
+        by_wh[wid]['stock_value'] += qty * (level.product.purchase_price or Decimal('0'))
+
+    warehouses = Warehouse.objects.filter(
+        branch__company=company, is_active=True,
+    ).select_related('branch')
+    sites = []
+    for wh in warehouses:
+        row = by_wh.get(wh.id, {
+            'warehouse_id': wh.id,
+            'warehouse_name': wh.name,
+            'branch_id': wh.branch_id,
+            'branch_name': wh.branch.name,
+            'is_pos_stock': wh.is_pos_stock,
+            'is_main': wh.branch.is_main,
+            'stock_qty': Decimal('0'),
+            'stock_value': Decimal('0'),
+        })
+        kind = 'main' if wh.branch.is_main and wh.is_pos_stock else (
+            'pos' if wh.is_pos_stock else 'warehouse'
+        )
+        sites.append({
+            **row,
+            'kind': kind,
+            'pending_requests': request_counts.get(wh.id, 0),
+            'stock_qty': float(row['stock_qty']),
+            'stock_value': float(row['stock_value']),
+        })
+
+    # Trier : siège, entrepôts, PDV
+    order = {'main': 0, 'warehouse': 1, 'pos': 2}
+    sites.sort(key=lambda s: (order.get(s['kind'], 9), s['branch_name'], s['warehouse_name']))
+    return sites
 
 
 class DashboardView(APIView):

@@ -14,6 +14,7 @@ import {
   Text,
   TextInput,
 } from 'react-native-paper';
+import AppHeader from '../components/AppHeader';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setUser } from '../store/authSlice';
 import { updateProfile } from '../api/auth';
@@ -111,10 +112,10 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Appbar.Header style={styles.header} elevated>
+      <AppHeader>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Mon compte" />
-      </Appbar.Header>
+      </AppHeader>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.identity}>
@@ -126,10 +127,10 @@ export default function ProfileScreen() {
           </Chip>
         </View>
 
-        <Card style={[styles.card, { backgroundColor: '#E3F2FD' }]}>
+        <Card style={[styles.card, { backgroundColor: '#CCFBF1' }]}>
           <Card.Content>
             <Text variant="bodyMedium">
-              Un seul compte Inventra pour le mobile et le web. Les paiements (Wave, Orange Money, MTN Money) se finalisent sur la version web.
+              Un seul compte Stokeya pour le mobile et le web. Les paiements (Wave, Orange Money) se finalisent sur la version web.
             </Text>
           </Card.Content>
         </Card>

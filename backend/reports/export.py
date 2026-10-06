@@ -111,7 +111,7 @@ class AnalyticsExportView(APIView):
         wb.save(buffer)
         buffer.seek(0)
 
-        filename = f"inventra_rapport_{data['period']}_{timezone.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"stokeya_rapport_{data['period']}_{timezone.now().strftime('%Y%m%d')}.xlsx"
         response = HttpResponse(
             buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

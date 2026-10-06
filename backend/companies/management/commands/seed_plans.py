@@ -4,7 +4,7 @@ from companies.plans import seed_plans
 
 
 class Command(BaseCommand):
-    help = 'Crée ou met à jour les packs d\'abonnement Inventra (Starter/Business/Enterprise).'
+    help = 'Crée ou met à jour les packs d\'abonnement Stokeya (Starter/Business/Enterprise).'
 
     def handle(self, *args, **options):
         plans = seed_plans()

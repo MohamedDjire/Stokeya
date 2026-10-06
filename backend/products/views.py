@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -10,7 +11,7 @@ from common.permissions import IsCompanyMember
 from companies import limits
 from inventory.models import StockLevel, StockMovement
 from . import import_service
-from .models import Product, ProductBatch
+from .models import Product, ProductBatch, ProductImportBatch
 from .serializers import ProductBatchSerializer, ProductSerializer
 
 
@@ -120,6 +121,159 @@ class ProductViewSet(CompanyQuerysetMixin, viewsets.ModelViewSet):
             return Response({'detail': str(exc)}, status=400)
 
         return Response(result, status=201)
+
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='import-analyze',
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_analyze(self, request):
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'Aucun fichier fourni (champ "file").'}, status=400)
+        try:
+            result = import_service.analyze_upload(
+                company=request.user.company,
+                user=request.user,
+                filename=upload.name,
+                file_bytes=upload.read(),
+            )
+        except import_service.ImportError_ as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(result, status=201)
+
+    @action(detail=False, methods=['post'], url_path=r'import-batches/(?P<batch_id>[0-9]+)/prepare')
+    def import_prepare(self, request, batch_id=None):
+        """Applique le mapping (si colonnes obligatoires manquantes) et renvoie le tableau."""
+        batch = ProductImportBatch.objects.filter(
+            company=request.user.company, id=batch_id,
+        ).first()
+        if not batch:
+            return Response({'detail': 'Import introuvable.'}, status=404)
+        try:
+            result = import_service.build_editable_rows(
+                batch,
+                column_mapping=request.data.get('column_mapping'),
+            )
+        except import_service.ImportError_ as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(result)
+
+    @action(detail=False, methods=['post'], url_path=r'import-batches/(?P<batch_id>[0-9]+)/validate')
+    def import_validate(self, request, batch_id=None):
+        batch = ProductImportBatch.objects.filter(
+            company=request.user.company, id=batch_id,
+        ).first()
+        if not batch:
+            return Response({'detail': 'Import introuvable.'}, status=404)
+        try:
+            result = import_service.validate_batch(
+                batch=batch,
+                column_mapping=request.data.get('column_mapping'),
+                duplicate_policy=request.data.get(
+                    'duplicate_policy', import_service.DUPLICATE_IGNORE,
+                ),
+                auto_create=bool(request.data.get('auto_create_related', True)),
+            )
+        except import_service.ImportError_ as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(result)
+
+    @action(detail=False, methods=['post'], url_path=r'import-batches/(?P<batch_id>[0-9]+)/execute')
+    def import_execute(self, request, batch_id=None):
+        batch = ProductImportBatch.objects.filter(
+            company=request.user.company, id=batch_id,
+        ).first()
+        if not batch:
+            return Response({'detail': 'Import introuvable.'}, status=404)
+
+        remaining = limits.remaining_products(request.user.company)
+        if remaining == 0:
+            return Response(
+                {
+                    'detail': (
+                        'Limite de produits de votre abonnement atteinte. '
+                        'Passez à un pack supérieur.'
+                    ),
+                },
+                status=403,
+            )
+
+        rows = request.data.get('rows')
+        try:
+            if rows is not None:
+                result = import_service.execute_from_rows(
+                    batch=batch,
+                    user=request.user,
+                    rows=rows,
+                    max_new=remaining,
+                )
+            else:
+                if request.data.get('column_mapping') is not None:
+                    batch.column_mapping = import_service._normalize_mapping(
+                        request.data.get('column_mapping'),
+                    )
+                    batch.save(update_fields=['column_mapping', 'updated_at'])
+                result = import_service.execute_batch(
+                    batch=batch,
+                    user=request.user,
+                    max_new=remaining,
+                    duplicate_policy=request.data.get(
+                        'duplicate_policy', import_service.DUPLICATE_UPDATE,
+                    ),
+                )
+        except import_service.ImportError_ as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(result, status=201)
+
+    @action(detail=False, methods=['post'], url_path=r'import-batches/(?P<batch_id>[0-9]+)/undo')
+    def import_undo(self, request, batch_id=None):
+        batch = ProductImportBatch.objects.filter(
+            company=request.user.company, id=batch_id,
+        ).first()
+        if not batch:
+            return Response({'detail': 'Import introuvable.'}, status=404)
+        try:
+            result = import_service.undo_batch(batch=batch, user=request.user)
+        except import_service.ImportError_ as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(result)
+
+    @action(detail=False, methods=['get'], url_path='import-history')
+    def import_history(self, request):
+        batches = (
+            ProductImportBatch.objects
+            .filter(company=request.user.company)
+            .select_related('created_by')
+            .order_by('-created_at')[:50]
+        )
+        now = timezone.now()
+        data = []
+        for batch in batches:
+            can_undo = (
+                batch.status == ProductImportBatch.Status.COMPLETED
+                and batch.can_undo_until
+                and now <= batch.can_undo_until
+            )
+            data.append({
+                'id': batch.id,
+                'filename': batch.filename,
+                'status': batch.status,
+                'total_rows': batch.total_rows,
+                'created_count': batch.created_count,
+                'updated_count': batch.updated_count,
+                'skipped_count': batch.skipped_count,
+                'errors_count': len(batch.errors or []),
+                'created_at': batch.created_at,
+                'can_undo_until': batch.can_undo_until,
+                'can_undo': can_undo,
+                'created_by': (
+                    batch.created_by.get_full_name() or batch.created_by.email
+                    if batch.created_by else None
+                ),
+            })
+        return Response(data)
 
     @action(
         detail=True,

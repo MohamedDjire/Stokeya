@@ -1,4 +1,4 @@
-# Inventra API — Sprint 1
+# Stokeya API — Sprint 1
 
 Base URL : `http://localhost:8000/api/v1`
 

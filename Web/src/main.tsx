@@ -2,20 +2,23 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import { CssBaseline } from '@mui/material';
 import { store } from './store';
-import { theme } from './theme';
+import { LocaleProvider } from './locale/LocaleProvider';
+import { hydrateLocaleFromStorage } from './locale/runtime';
 import App from './App';
+
+hydrateLocaleFromStorage();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
+      <LocaleProvider>
         <CssBaseline />
         <BrowserRouter>
           <App />
         </BrowserRouter>
-      </ThemeProvider>
+      </LocaleProvider>
     </Provider>
   </React.StrictMode>,
 );

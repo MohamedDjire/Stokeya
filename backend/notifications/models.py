@@ -6,6 +6,7 @@ class NotificationType(models.TextChoices):
     LOW_STOCK = 'low_stock', 'Stock faible'
     PAYMENT_DUE = 'payment_due', 'Paiement en retard'
     SALE = 'sale', 'Vente'
+    SHOP_ORDER = 'shop_order', 'Commande boutique'
     SYSTEM = 'system', 'Système'
     PROMOTION = 'promotion', 'Promotion'
 
@@ -22,6 +23,9 @@ class Notification(TimeStampedModel):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read', '-created_at']),
+        ]
 
     def __str__(self):
         return self.title

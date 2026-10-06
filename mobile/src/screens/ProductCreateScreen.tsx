@@ -21,6 +21,7 @@ import {
 } from '../api/auth';
 import { uploadProductImage } from '../api/products';
 import { colors } from '../theme/colors';
+import { previewWholesalePrice } from '../utils/pricing';
 import type { AppStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ProductCreate'>;
@@ -84,6 +85,10 @@ export default function ProductCreateScreen({ navigation }: Props) {
     unit_name: '',
     purchase_price: '',
     sale_price: '',
+    wholesale_min_qty: '10',
+    wholesale_discount_type: 'price' as 'price' | 'percent' | 'amount',
+    wholesale_discount_value: '',
+    wholesale_price: '',
     tax_rate: '0',
     min_stock: '0',
     max_stock: '',
@@ -140,6 +145,10 @@ export default function ProductCreateScreen({ navigation }: Props) {
         unit: form.unit,
         purchase_price: form.purchase_price || '0',
         sale_price: form.sale_price,
+        wholesale_min_qty: form.wholesale_min_qty || '10',
+        wholesale_discount_type: form.wholesale_discount_type,
+        wholesale_discount_value: form.wholesale_discount_value || null,
+        wholesale_price: form.wholesale_discount_type === 'price' ? (form.wholesale_price || null) : null,
         tax_rate: form.tax_rate || '0',
         min_stock: form.min_stock || '0',
         max_stock: form.max_stock || undefined,
@@ -208,7 +217,50 @@ export default function ProductCreateScreen({ navigation }: Props) {
           />
 
           <TextInput label="Prix achat" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.purchase_price} onChangeText={(v) => update('purchase_price', v)} />
-          <TextInput label="Prix vente" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.sale_price} onChangeText={(v) => update('sale_price', v)} />
+          <TextInput label="Prix détail (unité)" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.sale_price} onChangeText={(v) => update('sale_price', v)} />
+
+          <Text variant="titleMedium" style={styles.section}>Prix de gros / promo</Text>
+          <Text variant="bodySmall" style={styles.hint}>Ex. 10 000 F l’unité, dès 10 pièces → 9 300 F</Text>
+          <TextInput label="À partir de (quantité)" keyboardType="number-pad" mode="outlined" style={styles.input} value={form.wholesale_min_qty} onChangeText={(v) => update('wholesale_min_qty', v)} />
+          <MenuField
+            label="Type de promo"
+            value={
+              form.wholesale_discount_type === 'percent' ? 'Réduction %'
+                : form.wholesale_discount_type === 'amount' ? 'Réduction en F'
+                  : 'Nouveau prix unitaire'
+            }
+            items={[
+              { id: 1, name: 'Nouveau prix unitaire' },
+              { id: 2, name: 'Réduction %' },
+              { id: 3, name: 'Réduction en F' },
+            ]}
+            onSelect={(item) => update(
+              'wholesale_discount_type',
+              item.id === 2 ? 'percent' : item.id === 3 ? 'amount' : 'price',
+            )}
+          />
+          {form.wholesale_discount_type === 'price' ? (
+            <TextInput label="Prix de gros (unitaire)" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.wholesale_price} onChangeText={(v) => update('wholesale_price', v)} />
+          ) : (
+            <TextInput
+              label={form.wholesale_discount_type === 'percent' ? 'Réduction (%)' : 'Réduction (F par unité)'}
+              keyboardType="decimal-pad"
+              mode="outlined"
+              style={styles.input}
+              value={form.wholesale_discount_value}
+              onChangeText={(v) => update('wholesale_discount_value', v)}
+            />
+          )}
+          {(() => {
+            const preview = previewWholesalePrice(form.sale_price, form.wholesale_discount_type, form.wholesale_discount_value, form.wholesale_price);
+            if (!preview) return null;
+            return (
+              <Text style={styles.preview}>
+                Gros dès {form.wholesale_min_qty || 10} : {preview.toLocaleString('fr-FR')} F (détail {Number(form.sale_price || 0).toLocaleString('fr-FR')} F)
+              </Text>
+            );
+          })()}
+
           <TextInput label="TVA (%)" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.tax_rate} onChangeText={(v) => update('tax_rate', v)} />
           <TextInput label="Stock minimum" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.min_stock} onChangeText={(v) => update('min_stock', v)} />
           <TextInput label="Stock maximum" keyboardType="decimal-pad" mode="outlined" style={styles.input} value={form.max_stock} onChangeText={(v) => update('max_stock', v)} />
@@ -236,6 +288,9 @@ const styles = StyleSheet.create({
   loader: { marginTop: 48 },
   content: { padding: 16, paddingBottom: 32 },
   input: { marginBottom: 12 },
+  section: { fontWeight: '800', marginTop: 8, marginBottom: 4, color: colors.primary },
+  hint: { color: '#64748B', marginBottom: 8 },
+  preview: { color: '#2E7D32', fontWeight: '700', marginBottom: 12 },
   imageRow: { alignItems: 'center', marginBottom: 16, gap: 8 },
   image: { width: 96, height: 96, borderRadius: 12, backgroundColor: '#E5E7EB' },
   imagePlaceholder: { backgroundColor: colors.primary + '15' },

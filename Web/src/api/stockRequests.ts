@@ -18,10 +18,13 @@ export interface StockRequest {
   to_warehouse_name: string;
   status: string;
   status_display: string;
+  source?: string;
   notes: string;
   requested_by: number | null;
   requested_by_name: string | null;
   processed_by: number | null;
+  transfer_id?: number | null;
+  transfer_reference?: string | null;
   items: StockRequestItem[];
   created_at: string;
   updated_at: string;
@@ -33,16 +36,25 @@ export async function fetchStockRequests(params?: {
   to_warehouse?: number;
 }): Promise<StockRequest[]> {
   const { data } = await api.get('/stock-requests/', { params });
-  return data.results;
+  return data.results ?? data;
 }
 
 export async function createStockRequest(payload: {
   from_warehouse?: number | null;
   to_warehouse: number;
   notes?: string;
+  source?: string;
   items: Array<{ product: number; quantity: string }>;
 }): Promise<StockRequest> {
   const { data } = await api.post('/stock-requests/', payload);
+  return data;
+}
+
+export async function cashierStockAlert(payload: {
+  product_id: number;
+  to_warehouse_id?: number;
+}): Promise<StockRequest> {
+  const { data } = await api.post('/stock-requests/cashier-alert/', payload);
   return data;
 }
 
@@ -59,8 +71,21 @@ export async function updateStockRequest(
   return data;
 }
 
-export async function approveStockRequest(id: number): Promise<StockRequest> {
-  const { data } = await api.post(`/stock-requests/${id}/approve/`);
+export async function posValidateStockRequest(
+  id: number,
+  payload?: {
+    notes?: string;
+    items?: Array<{ product_id: number; quantity: string }>;
+  },
+): Promise<StockRequest> {
+  const { data } = await api.post(`/stock-requests/${id}/pos-validate/`, payload || {});
+  return data;
+}
+
+export async function approveStockRequest(id: number, fromWarehouseId?: number): Promise<StockRequest> {
+  const { data } = await api.post(`/stock-requests/${id}/approve/`, {
+    from_warehouse_id: fromWarehouseId,
+  });
   return data;
 }
 
@@ -69,8 +94,10 @@ export async function rejectStockRequest(id: number): Promise<StockRequest> {
   return data;
 }
 
-export async function fulfillStockRequest(id: number): Promise<StockRequest> {
-  const { data } = await api.post(`/stock-requests/${id}/fulfill/`);
+export async function fulfillStockRequest(id: number, fromWarehouseId?: number): Promise<StockRequest> {
+  const { data } = await api.post(`/stock-requests/${id}/fulfill/`, {
+    from_warehouse_id: fromWarehouseId,
+  });
   return data;
 }
 

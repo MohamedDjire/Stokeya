@@ -1,4 +1,4 @@
-const QUEUE_KEY = 'inventra_offline_sales_queue';
+const QUEUE_KEY = 'stokeya_offline_sales_queue';
 
 export type WebOfflineSale = {
   client_reference: string;
@@ -36,8 +36,12 @@ export function enqueueOfflineSale(sale: WebOfflineSale) {
 
 export function removeSynced(refs: string[]) {
   if (!refs.length) return;
-  const set = new Set(refs);
+  const set = new Set(refs.filter(Boolean));
   saveQueue(getOfflineQueue().filter((s) => !set.has(s.client_reference)));
+}
+
+export function clearOfflineQueue() {
+  saveQueue([]);
 }
 
 export function makeClientReference() {
